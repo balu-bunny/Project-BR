@@ -1,0 +1,61 @@
+UserData:
+  Fn::Base64: !Sub |
+    #!/bin/bash
+    apt update -y
+
+    # Install Node.js 18
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    apt install -y nodejs
+
+    # Install Git and Unzip
+    apt install -y git unzip
+
+    # Install Salesforce CLI
+    npm install -g @salesforce/cli
+
+    # Install AWS CLI v2
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    unzip awscliv2.zip
+    ./aws/install
+
+    # Install global AWS SDKs
+    npm install -g @aws-sdk/client-s3 @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+
+    # Clone GitHub repo
+    cd /home/ubuntu
+    git clone https://github.com/your-username/your-repo.git
+    cd your-repo
+
+    # Initialize and install dependencies
+    npm init -y
+    npm install express
+
+    # Create a simple app if not present
+    if [ ! -f app.js ]; then
+      echo "const express = require('express'); const app = express(); app.get('/', (req, res) => res.send('Hello from Node.js behind NGINX!')); app.listen(3000);" > app.js
+    fi
+
+    # Install PM2 and start app
+    npm install -g pm2
+    pm2 start app.js
+    pm2 save
+    pm2 startup
+
+    # Install and configure NGINX
+    apt install -y nginx
+    cat > /etc/nginx/sites-available/default <<EOF
+    server {
+        listen 80;
+        location / {
+            proxy_pass http://localhost:3000;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade \$http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host \$host;
+            proxy_cache_bypass \$http_upgrade;
+        }
+    }
+EOF
+
+    systemctl restart nginx
+    systemctl enable nginx
