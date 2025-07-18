@@ -1,0 +1,249 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  
+  <script>
+    if (!localStorage.getItem('idToken')) {
+      window.location.href = '/login.html';
+    }
+
+    function logout() {
+      localStorage.removeItem('idToken');
+      window.location.href = '/login.html';
+    }
+  </script>
+  <button onclick="logout()">Logout</button>
+  <title>Salesforce Backup Manager</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f2f4f8; margin: 40px; }
+    .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+
+    .tabs { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab {
+      padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 16px;
+    }
+    .tab.active {
+      border-bottom: 3px solid #007bff; font-weight: bold; color: #007bff;
+    }
+
+    .content { font-size: 16px; color: #333; }
+    .task { margin-top: 10px; padding: 10px; background: #f9f9f9; border-radius: 6px; }
+
+    button { margin: 10px 5px 0 0; padding: 8px 12px; font-size: 14px; border-radius: 4px; cursor: pointer; }
+    .primary { background: #007bff; color: white; border: none; }
+    .secondary { background: #6c757d; color: white; border: none; }
+
+    .modal {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5); justify-content: center; align-items: center;
+    }
+    .modal-content {
+      background: white; padding: 20px; border-radius: 10px; min-width: 300px;
+    }
+    .modal input, .modal select {
+      width: 100%; padding: 8px; margin-top: 10px;
+    }
+  </style>
+  <script>
+  let orgs = [];
+  let activeOrgId = null;
+
+  async function loadOrgs() {
+    try {
+      const response = await fetch('/api/orgs');
+      orgs = await response.json();
+      renderTabs();
+      if (orgs.length > 0) setActiveOrg(orgs[0].id);
+    } catch (error) {
+      console.error('Failed to load orgs:', error);
+      document.getElementById('orgContent').textContent = 'Failed to load orgs.';
+    }
+  }
+
+  // existing functions: renderTabs(), setActiveOrg(), etc. go here...
+
+  // Call loadOrgs on page load
+  window.onload = loadOrgs;
+</script>
+</head>
+<body>
+  <div class="container">
+    <h2>Salesforce Backup & Restore Scheduler</h2>
+    <button class="primary" onclick="openAddOrgModal()">Add New Org</button>
+    <div class="tabs" id="orgTabs"></div>
+    <div class="content" id="orgContent">Select an org to view scheduled tasks.</div>
+  </div>
+
+  <!-- Add Org Modal -->
+  <div class="modal" id="addOrgModal">
+    <div class="modal-content">
+      <h3>Add New Org</h3>
+      <input type="text" id="newOrgName" placeholder="Enter Org Name" />
+      <select id="newOrgType">
+        <option value="Production">Production</option>
+        <option value="Sandbox">Sandbox</option>
+      </select>
+      <br/>
+      <button class="primary" onclick="addOrg()">Add</button>
+      <button class="secondary" onclick="closeAddOrgModal()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- New Backup Modal -->
+  <div class="modal" id="backupModal">
+    <div class="modal-content">
+      <h3>New Backup for <span id="backupOrgName"></span></h3>
+      <label>Select Objects:</label>
+      <select id="objectList" multiple size="5">
+        <option>Account</option>
+        <option>Contact</option>
+        <option>Opportunity</option>
+        <option>Lead</option>
+        <option>Custom__c</option>
+      </select>
+
+      <label>Backup Type:</label>
+      <select id="backupType">
+        <option value="incremental">Incremental</option>
+        <option value="one-time">One Time</option>
+      </select>
+      <br/>
+      <button class="primary" onclick="submitBackup()">Start Backup</button>
+      <button class="secondary" onclick="closeBackupModal()">Cancel</button>
+    </div>
+  </div>
+
+  <script>
+
+
+    function renderTabs() {
+      const tabContainer = document.getElementById('orgTabs');
+      tabContainer.innerHTML = '';
+      orgs.forEach(org => {
+        const tab = document.createElement('button');
+        tab.className = 'tab' + (org.id === activeOrgId ? ' active' : '');
+        tab.textContent = `${org.name} (${org.type})`;
+        tab.onclick = () => setActiveOrg(org.id);
+        tabContainer.appendChild(tab);
+      });
+    }
+
+    function setActiveOrg(id) {
+      activeOrgId = id;
+      renderTabs();
+      const org = orgs.find(o => o.id === id);
+      const content = document.getElementById('orgContent');
+      content.innerHTML = `
+        <div><strong>Org Name:</strong> ${org.name}</div>
+        <div><strong>Type:</strong> ${org.type}</div>
+        <div class="task"><strong>Scheduled Task:</strong> ${org.scheduledTask || 'No task scheduled'}</div>
+        <button class="primary" onclick="openBackupModal('${org.id}')">New Backup</button>
+      `;
+    }
+
+    function openAddOrgModal() {
+      document.getElementById('addOrgModal').style.display = 'flex';
+    }
+
+    function closeAddOrgModal() {
+      document.getElementById('addOrgModal').style.display = 'none';
+      document.getElementById('newOrgName').value = '';
+    }
+
+    function addOrg() {
+      const name = document.getElementById('newOrgName').value.trim();
+      const type = document.getElementById('newOrgType').value;
+      if (!name) return showModal('Org name is required');
+      const id = Date.now().toString();
+        fetch('/api/addNewOrg', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      orgId:name,
+      type: type
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    showModal(data.message =''+ data.output);
+    closeBackupModal();
+  })
+  .catch(err => {
+    console.error('Backup failed:', err);
+    showModal('Failed to start backup');
+  });
+      orgs.push({ id, name, type, scheduledTask: null });
+      closeAddOrgModal();
+      setActiveOrg(id);
+    }
+
+    function openBackupModal(orgId) {
+      const org = orgs.find(o => o.id === orgId);
+      document.getElementById('backupOrgName').innerText = org.name;
+      document.getElementById('backupModal').dataset.orgId = orgId;
+      document.getElementById('backupModal').style.display = 'flex';
+    }
+
+    function closeBackupModal() {
+      document.getElementById('backupModal').style.display = 'none';
+      document.getElementById('objectList').selectedIndex = -1;
+      document.getElementById('backupType').selectedIndex = 0;
+    }
+function submitBackup() {
+  const orgId = document.getElementById('backupModal').dataset.orgId;
+  const selectedObjects = Array.from(document.getElementById('objectList').selectedOptions).map(o => o.value);
+  const backupType = document.getElementById('backupType').value;
+
+  if (selectedObjects.length === 0) {
+    return showModal('Please select at least one object.');
+  }
+
+  fetch('/api/backup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      orgId,
+      objects: selectedObjects,
+      type: backupType
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    showModal(data.message || 'Backup started!');
+    closeBackupModal();
+  })
+  .catch(err => {
+    console.error('Backup failed:', err);
+    showModal('Failed to start backup');
+  });
+}
+function showModal(message) {
+  document.getElementById('modalMessage').innerText = message;
+  document.getElementById('customModal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('customModal').style.display = 'none';
+}
+
+
+    renderTabs();
+    if (orgs.length > 0) setActiveOrg(orgs[0].id);
+  </script>
+  <!-- Modal Container -->
+<div id="customModal" style="
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.5); justify-content:center; align-items:center;
+  z-index:1000;">
+  <div style="
+    background:#fff; padding:20px; border-radius:8px; min-width:300px; max-width:90%;
+    box-shadow:0 5px 15px rgba(0,0,0,0.3); text-align:center;">
+    <p id="modalMessage">Message goes here</p>
+    <button onclick="closeModal()" style="padding:8px 16px;">OK</button>
+  </div>
+</div>
+
+</body>
+</html>
