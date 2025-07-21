@@ -1,0 +1,149 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: EC2 instance with full access to S3, DynamoDB, and custom ports open
+
+Parameters:
+  VpcId:
+    Description: VPC Id to launch resources in
+    Type: AWS::EC2::VPC::Id
+
+Resources:
+  MySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP, HTTPS, and port 3000
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+
+  MyIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+      RoleName: EC2AppAccessRole
+
+  MyInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref MyIAMRole
+      InstanceProfileName: EC2AppInstanceProfile
+
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0c55b159cbfafe1f0  # Amazon Linux 2 (update per region)
+      InstanceType: t2.micro
+      IamInstanceProfile: !Ref MyInstanceProfile
+      SecurityGroupIds:
+        - !Ref MySecurityGroup
+      Tags:
+        - Key: Name
+          Value: MyEC2WithAccess
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+
+          # Install Node.js
+          curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+          yum install -y nodejs git unzip nginx
+
+          # Install Salesforce CLI
+          npm install -g @salesforce/cli
+
+          # Install AWS CLI v2
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          ./aws/install
+
+          # Install AWS SDKs globally
+          npm install -g @aws-sdk/client-s3 @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+
+          # Clone your Node.js app from GitHub
+          cd /home/ec2-user
+          git clone https://github.com/your-username/your-repo.git
+          cd your-repo
+
+          npm install
+          npm install -g pm2
+          pm2 start app.js
+          pm2 save
+          pm2 startup
+
+          # Configure NGINX as reverse proxy
+          cat > /etc/nginx/nginx.conf <<EOF
+          events {}
+          http {
+              server {
+                  listen 80;
+                  location / {
+                      proxy_pass http://localhost:3000;
+                      proxy_http_version 1.1;
+                      proxy_set_header Upgrade \$http_upgrade;
+                      proxy_set_header Connection 'upgrade';
+                      proxy_set_header Host \$host;
+                      proxy_cache_bypass \$http_upgrade;
+                  }
+              }
+          }
+          EOF
+
+          systemctl restart nginx
+          systemctl enable nginx
+
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "myapp-bucket-${AWS::Region}-${AWS::AccountId}"
+      Tags:
+        - Key: Name
+          Value: MyAppBucket
+
+  MyDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: MyAppTable
+      BillingMode: PAYPERREQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      Tags:
+        - Key: Name
+          Value: MyAppTable
+
+Outputs:
+  EC2InstanceId:
+    Description: The ID of the EC2 instance
+    Value: !Ref MyEC2Instance
+
+  S3BucketName:
+    Description: The name of the created S3 bucket
+    Value: !Ref MyS3Bucket
+
+  DynamoDBTableName:
+    Description: The name of the created DynamoDB table
+    Value: !Ref MyDynamoDBTable
