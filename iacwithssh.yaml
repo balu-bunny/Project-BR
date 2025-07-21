@@ -2,6 +2,9 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: EC2 instance with full access to S3, DynamoDB, and custom ports open
 
 Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to SSH into the instance
+    Type: AWS::EC2::KeyPair::KeyName
   VpcId:
     Description: VPC Id to launch resources in
     Type: AWS::EC2::VPC::Id
@@ -10,9 +13,13 @@ Resources:
   MySecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow HTTP, HTTPS, and port 3000
+      GroupDescription: Allow SSH, HTTP, HTTPS, and port 3000
       VpcId: !Ref VpcId
       SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
@@ -64,11 +71,14 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          yum update -y
+          apt update -y
 
           # Install Node.js
-          curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
-          yum install -y nodejs git unzip nginx
+          curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+          apt install -y nodejs
+
+          # Install Git and Unzip
+          apt install -y git unzip
 
           # Install Salesforce CLI
           npm install -g @salesforce/cli
@@ -82,30 +92,33 @@ Resources:
           npm install -g @aws-sdk/client-s3 @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
 
           # Clone your Node.js app from GitHub
-          cd /home/ec2-user
-          git clone https://github.com/your-username/your-repo.git
-          cd your-repo
+          cd /home/ubuntu
+          git clone https://github.com/balu-bunny/Project-BR.git
+          cd Project-BR
 
-          npm install
+          # Initialize Node project (if not already)
+          npm init -y
+
+          # Install Express and other dependencies
+          npm install express
+
+          # Install and configure PM2
           npm install -g pm2
           pm2 start app.js
           pm2 save
           pm2 startup
-
-          # Configure NGINX as reverse proxy
-          cat > /etc/nginx/nginx.conf <<EOF
-          events {}
-          http {
-              server {
-                  listen 80;
-                  location / {
-                      proxy_pass http://localhost:3000;
-                      proxy_http_version 1.1;
-                      proxy_set_header Upgrade \$http_upgrade;
-                      proxy_set_header Connection 'upgrade';
-                      proxy_set_header Host \$host;
-                      proxy_cache_bypass \$http_upgrade;
-                  }
+          # Install and configure NGINX
+          apt install -y nginx
+          cat > /etc/nginx/sites-available/default <<EOF
+          server {
+              listen 80;
+              location / {
+                  proxy_pass http://localhost:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host \$host;
+                  proxy_cache_bypass \$http_upgrade;
               }
           }
           EOF
