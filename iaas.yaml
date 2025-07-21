@@ -5,17 +5,15 @@ Parameters:
   KeyName:
     Description: Name of an existing EC2 KeyPair to SSH into the instance
     Type: AWS::EC2::KeyPair::KeyName
-
-Resources:
-
-  DefaultVPC:
+  VpcId:
+    Description: VPC Id to launch resources in
     Type: AWS::EC2::VPC::Id
-
+Resources:
   MySecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow SSH, HTTP, HTTPS, and port 3000
-      VpcId: !Ref DefaultVPC
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
@@ -108,7 +106,24 @@ Resources:
           pm2 start app.js
           pm2 save
           pm2 startup
+          # Install and configure NGINX
+          apt install -y nginx
+          cat > /etc/nginx/sites-available/default <<EOF
+          server {
+              listen 80;
+              location / {
+                  proxy_pass http://localhost:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host \$host;
+                  proxy_cache_bypass \$http_upgrade;
+              }
+          }
+          EOF
 
+          systemctl restart nginx
+          systemctl enable nginx
 
   MyS3Bucket:
     Type: AWS::S3::Bucket
