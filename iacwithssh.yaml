@@ -21,21 +21,35 @@ Parameters:
 
   EC2DeletionPolicy:
     Type: String
-    Default: Retain
+    Default: Delete
     AllowedValues: [Retain, Delete]
     Description: DeletionPolicy for EC2 instance
 
   S3DeletionPolicy:
     Type: String
-    Default: Retain
+    Default: Delete
     AllowedValues: [Retain, Delete]
     Description: DeletionPolicy for S3 bucket
 
   DynamoDeletionPolicy:
     Type: String
-    Default: Retain
+    Default: Delete
     AllowedValues: [Retain, Delete]
     Description: DeletionPolicy for DynamoDB table
+  CognitoDeletionPolicy:
+    Type: String
+    Default: Delete
+    AllowedValues: [Retain, Delete]
+    Description: DeletionPolicy for Cognito resources
+
+  CognitoUserPoolName:
+    Type: String
+    Default: QPMSUserPool
+    Description: Name of the Cognito User Pool
+  CognitoIdentityPoolName:
+    Type: String
+    Default: QPMSIdentityPool
+    Description: Name of the Cognito Identity Pool
 
 Conditions:
   UseEncryption: !Not [!Equals [!Ref BucketEncryptionType, none]]
@@ -43,9 +57,139 @@ Conditions:
   DeleteEC2: !Equals [!Ref EC2DeletionPolicy, Delete]
   DeleteS3: !Equals [!Ref S3DeletionPolicy, Delete]
   DeleteDynamo: !Equals [!Ref DynamoDeletionPolicy, Delete]
-
+  DeleteCognito: !Equals [!Ref CognitoDeletionPolicy, Delete]
 Resources:
+  QPMSDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Metadata:
+      AWS::CloudFormation::DeletionPolicy: !If [DeleteDynamo, Delete, Retain]
+    Properties:
+      TableName: JobTable
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      Tags:
+        - Key: Name
+          Value: QPMSAppTable
+  QPMSUserPool:
+    Type: AWS::Cognito::UserPool
+    Metadata:
+      AWS::CloudFormation::DeletionPolicy: !If [DeleteCognito, Delete, Retain]
+    Properties:
+      UserPoolName: !Ref CognitoUserPoolName
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
 
+  QPMSUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Metadata:
+      AWS::CloudFormation::DeletionPolicy: !If [DeleteCognito, Delete, Retain]
+    Properties:
+      ClientName: WebAppClient
+      UserPoolId: !Ref QPMSUserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+      CallbackURLs:
+        - http://localhost:3000/callback
+      LogoutURLs:
+        - http://localhost:3000/logout
+      SupportedIdentityProviders:
+        - COGNITO
+
+  QPMSCognitoAuthRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      AWS::CloudFormation::DeletionPolicy: !If [DeleteCognito, Delete, Retain]
+    Properties:
+      RoleName: CognitoAuthRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                cognito-identity.amazonaws.com:aud: !Ref QPMSIdentityPool
+              "ForAnyValue:StringLike":
+                cognito-identity.amazonaws.com:amr: authenticated
+      Policies:
+        - PolicyName: CognitoAuthorizedPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - dynamodb:GetItem
+                Resource: "*"
+
+  QPMSCognitoUnauthRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      AWS::CloudFormation::DeletionPolicy: !If [DeleteCognito, Delete, Retain]
+    Properties:
+      RoleName: CognitoUnauthRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                cognito-identity.amazonaws.com:aud: !Ref QPMSIdentityPool
+              "ForAnyValue:StringLike":
+                cognito-identity.amazonaws.com:amr: unauthenticated
+      Policies:
+        - PolicyName: CognitoGuestPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Deny
+                Action: "*"
+                Resource: "*"
+
+  QPMSIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Metadata:
+      AWS::CloudFormation::DeletionPolicy: !If [DeleteCognito, Delete, Retain]
+    Properties:
+      IdentityPoolName: !Ref CognitoIdentityPoolName
+      AllowUnauthenticatedIdentities: true
+      CognitoIdentityProviders:
+        - ClientId: !Ref QPMSUserPoolClient
+          ProviderName: !GetAtt QPMSUserPool.ProviderName
+
+  QPMSIdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Metadata:
+      AWS::CloudFormation::DeletionPolicy: !If [DeleteCognito, Delete, Retain]
+    Properties:
+      IdentityPoolId: !Ref QPMSIdentityPool
+      Roles:
+        authenticated: !GetAtt QPMSCognitoAuthRole.Arn
+        unauthenticated: !GetAtt QPMSCognitoUnauthRole.Arn
   QPMSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -126,10 +270,20 @@ Resources:
           pm2 save
           pm2 startup
 
-          TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600)
+          TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
 
           PUBLIC_DNS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-hostname)
 
+          REGION=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/dynamic/instance-identity/document |  grep region | awk -F\" '{print $4}')
+
+          # Save the region in env.json
+          echo "{\"region\": \"$REGION\"}" > env.json
+          echo '{
+            "region": "'$REGION'",
+            "userPoolId": "${QPMSUserPool}",
+            "userPoolClientId": "${QPMSUserPoolClient}",
+            "identityPoolId": "${QPMSIdentityPool}"
+          }' > /home/ubuntu/Project-BR/env.json
           cat > /etc/nginx/sites-available/default <<EOF
           server {
               listen 80;
@@ -148,7 +302,7 @@ Resources:
           systemctl enable nginx
           apt install -y certbot python3-certbot-nginx
           certbot --nginx --non-interactive --agree-tos --redirect \
-            --email your-email@example.com \
+            --email balakrishna@qualityze.com \
             -d \$PUBLIC_DNS
 
   QPMSS3Bucket:
@@ -170,22 +324,7 @@ Resources:
                   - AES256
         - !Ref AWS::NoValue
 
-  QPMSDynamoDBTable:
-    Type: AWS::DynamoDB::Table
-    Metadata:
-      AWS::CloudFormation::DeletionPolicy: !If [DeleteDynamo, Delete, Retain]
-    Properties:
-      TableName: JobTable
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: id
-          AttributeType: S
-      KeySchema:
-        - AttributeName: id
-          KeyType: HASH
-      Tags:
-        - Key: Name
-          Value: QPMSAppTable
+
 
 Outputs:
   EC2InstanceId:
@@ -199,3 +338,19 @@ Outputs:
   DynamoDBTableName:
     Description: The name of the created DynamoDB table
     Value: !Ref QPMSDynamoDBTable
+
+  SecurityGroupId:
+    Description: The ID of the security group created for the EC2 instance
+    Value: !Ref QPMSSecurityGroup
+
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref QPMSUserPool
+
+  CognitoUserPoolClientId:
+    Description: Cognito User Pool App Client ID
+    Value: !Ref QPMSUserPoolClient
+
+  CognitoIdentityPoolId:
+    Description: Cognito Identity Pool ID
+    Value: !Ref QPMSIdentityPool

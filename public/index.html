@@ -14,13 +14,25 @@
   </form>
 
   <script>
-    const poolData = {
-      UserPoolId: 'us-east-1_XXXXXXXXX', // Your user pool id here
-      ClientId: 'XXXXXXXXXXXXXXXXXXXXXX' // Your app client id here
-    };
 
-    const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
 
+
+    let userPool;
+
+    fetch('/env.json')
+      .then(response => response.json())
+      .then(config => {
+        const poolData = {
+          UserPoolId: config.UserPoolId,
+          ClientId: config.ClientId
+        };
+        userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+      })
+      .catch(error => {
+        console.error('Failed to load Cognito config:', error);
+        alert('Unable to load configuration.');
+      });
+      
     function login(e) {
       e.preventDefault();
       const username = document.getElementById('username').value;
