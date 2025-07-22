@@ -5,9 +5,11 @@ Parameters:
   KeyName:
     Description: Name of an existing EC2 KeyPair to SSH into the instance
     Type: AWS::EC2::KeyPair::KeyName
+
   VpcId:
     Description: VPC Id to launch resources in
     Type: AWS::EC2::VPC::Id
+
   BucketEncryptionType:
     Type: String
     Description: Choose encryption for the S3 bucket
@@ -17,12 +19,33 @@ Parameters:
       - aws:kms
       - none
 
+  EC2DeletionPolicy:
+    Type: String
+    Default: Retain
+    AllowedValues: [Retain, Delete]
+    Description: DeletionPolicy for EC2 instance
+
+  S3DeletionPolicy:
+    Type: String
+    Default: Retain
+    AllowedValues: [Retain, Delete]
+    Description: DeletionPolicy for S3 bucket
+
+  DynamoDeletionPolicy:
+    Type: String
+    Default: Retain
+    AllowedValues: [Retain, Delete]
+    Description: DeletionPolicy for DynamoDB table
+
 Conditions:
   UseEncryption: !Not [!Equals [!Ref BucketEncryptionType, none]]
   UseKmsEncryption: !Equals [!Ref BucketEncryptionType, aws:kms]
-
+  DeleteEC2: !Equals [!Ref EC2DeletionPolicy, Delete]
+  DeleteS3: !Equals [!Ref S3DeletionPolicy, Delete]
+  DeleteDynamo: !Equals [!Ref DynamoDeletionPolicy, Delete]
 
 Resources:
+
   QPMSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -71,7 +94,8 @@ Resources:
 
   QPMSEC2Instance:
     Type: AWS::EC2::Instance
-    DeletionPolicy: Retain
+    Metadata:
+      AWS::CloudFormation::DeletionPolicy: !If [DeleteEC2, Delete, Retain]
     Properties:
       ImageId: ami-020cba7c55df1f615
       InstanceType: t2.micro
@@ -85,53 +109,31 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           apt update -y
-
-          # Install Node.js
           curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-          apt install -y nodejs
-
-          # Install Git and Unzip
-          apt install -y git unzip
-
-          # Install Salesforce CLI
+          apt install -y nodejs git unzip nginx
           npm install -g @salesforce/cli
-
-          # Install AWS CLI v2
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           ./aws/install
-
-          # Install AWS SDKs globally
           npm install -g @aws-sdk/client-s3 @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
-
-          # Clone your Node.js app from GitHub
           cd /home/ubuntu
           git clone https://github.com/balu-bunny/Project-BR.git
           cd Project-BR
-
-          # Initialize Node project (if not already)
           npm init -y
-
-          # Install Express and other dependencies
           npm install express
-
-          # Install and configure PM2
           npm install -g pm2
           pm2 start app.js
           pm2 save
           pm2 startup
 
-          # Install and configure NGINX
-          apt install -y nginx
+          TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600)
 
-          # Get EC2 public DNS dynamically
-          PUBLIC_DNS=$(curl -s http://169.254.169.254/latest/meta-data/public-hostname)
+          PUBLIC_DNS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-hostname)
 
           cat > /etc/nginx/sites-available/default <<EOF
           server {
               listen 80;
               server_name \$PUBLIC_DNS;
-
               location / {
                   proxy_pass http://localhost:3000;
                   proxy_http_version 1.1;
@@ -142,22 +144,17 @@ Resources:
               }
           }
           EOF
-
           systemctl restart nginx
           systemctl enable nginx
-
-          # Install Certbot and request HTTPS certificate
           apt install -y certbot python3-certbot-nginx
-
-          # Run certbot with dynamic domain
           certbot --nginx --non-interactive --agree-tos --redirect \
             --email your-email@example.com \
             -d \$PUBLIC_DNS
 
-
   QPMSS3Bucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
+    Metadata:
+      AWS::CloudFormation::DeletionPolicy: !If [DeleteS3, Delete, Retain]
     Properties:
       BucketName: !Sub "myapp-bucket-${AWS::Region}-${AWS::AccountId}"
       Tags:
@@ -175,7 +172,8 @@ Resources:
 
   QPMSDynamoDBTable:
     Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
+    Metadata:
+      AWS::CloudFormation::DeletionPolicy: !If [DeleteDynamo, Delete, Retain]
     Properties:
       TableName: JobTable
       BillingMode: PAY_PER_REQUEST
