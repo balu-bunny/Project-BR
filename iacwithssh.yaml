@@ -8,9 +8,22 @@ Parameters:
   VpcId:
     Description: VPC Id to launch resources in
     Type: AWS::EC2::VPC::Id
+  BucketEncryptionType:
+    Type: String
+    Description: Choose encryption for the S3 bucket
+    Default: AES256
+    AllowedValues:
+      - AES256
+      - aws:kms
+      - none
+
+Conditions:
+  UseEncryption: !Not [!Equals [!Ref BucketEncryptionType, none]]
+  UseKmsEncryption: !Equals [!Ref BucketEncryptionType, aws:kms]
+
 
 Resources:
-  MySecurityGroup:
+  QPMSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow SSH, HTTP, HTTPS, and port 3000
@@ -33,7 +46,7 @@ Resources:
           ToPort: 3000
           CidrIp: 0.0.0.0/0
 
-  MyIAMRole:
+  QPMSIAMRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -49,25 +62,25 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
       RoleName: EC2AppAccessRole
 
-  MyInstanceProfile:
+  QPMSInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Roles:
-        - !Ref MyIAMRole
+        - !Ref QPMSIAMRole
       InstanceProfileName: EC2AppInstanceProfile
 
-  MyEC2Instance:
+  QPMSEC2Instance:
     Type: AWS::EC2::Instance
     DeletionPolicy: Retain
     Properties:
       ImageId: ami-020cba7c55df1f615
       InstanceType: t2.micro
-      IamInstanceProfile: !Ref MyInstanceProfile
+      IamInstanceProfile: !Ref QPMSInstanceProfile
       SecurityGroupIds:
-        - !Ref MySecurityGroup
+        - !Ref QPMSSecurityGroup
       Tags:
         - Key: Name
-          Value: MyEC2WithAccess
+          Value: QPMSEC2WithAccess
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
@@ -107,11 +120,18 @@ Resources:
           pm2 start app.js
           pm2 save
           pm2 startup
+
           # Install and configure NGINX
           apt install -y nginx
+
+          # Get EC2 public DNS dynamically
+          PUBLIC_DNS=$(curl -s http://169.254.169.254/latest/meta-data/public-hostname)
+
           cat > /etc/nginx/sites-available/default <<EOF
           server {
               listen 80;
+              server_name \$PUBLIC_DNS;
+
               location / {
                   proxy_pass http://localhost:3000;
                   proxy_http_version 1.1;
@@ -126,16 +146,34 @@ Resources:
           systemctl restart nginx
           systemctl enable nginx
 
-  MyS3Bucket:
+          # Install Certbot and request HTTPS certificate
+          apt install -y certbot python3-certbot-nginx
+
+          # Run certbot with dynamic domain
+          certbot --nginx --non-interactive --agree-tos --redirect \
+            --email your-email@example.com \
+            -d \$PUBLIC_DNS
+
+
+  QPMSS3Bucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     Properties:
       BucketName: !Sub "myapp-bucket-${AWS::Region}-${AWS::AccountId}"
       Tags:
         - Key: Name
-          Value: MyAppBucket
+          Value: QPMSAppBucket
+      BucketEncryption: !If
+        - UseEncryption
+        - ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: !If
+                  - UseKmsEncryption
+                  - aws:kms
+                  - AES256
+        - !Ref AWS::NoValue
 
-  MyDynamoDBTable:
+  QPMSDynamoDBTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
     Properties:
@@ -149,17 +187,17 @@ Resources:
           KeyType: HASH
       Tags:
         - Key: Name
-          Value: MyAppTable
+          Value: QPMSAppTable
 
 Outputs:
   EC2InstanceId:
     Description: The ID of the EC2 instance
-    Value: !Ref MyEC2Instance
+    Value: !Ref QPMSEC2Instance
 
   S3BucketName:
     Description: The name of the created S3 bucket
-    Value: !Ref MyS3Bucket
+    Value: !Ref QPMSS3Bucket
 
   DynamoDBTableName:
     Description: The name of the created DynamoDB table
-    Value: !Ref MyDynamoDBTable
+    Value: !Ref QPMSDynamoDBTable
