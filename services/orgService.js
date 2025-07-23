@@ -22,9 +22,12 @@ exports.fetchOrgList = () => {
 };
 
 exports.handleLogin = (req, res) => {
+  console.log('Handling login for org:');
   const { orgId } = req.body;
-  const login = spawn('sf', ['org', 'login', 'device', '--alias', orgId]);
+  console.log('Handling login for org:', req.body);
 
+  const login = spawn('sf', ['org', 'login', 'device', '--alias', orgId]);
+  console.log(login);
   let output = '';
   let responded = false;
 

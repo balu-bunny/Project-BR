@@ -11,5 +11,6 @@ exports.getOrgs = async (req, res) => {
 };
 
 exports.addNewOrg = (req, res) => {
+  console.log('Adding new org:', req.body);
   orgService.handleLogin(req, res);
 };
