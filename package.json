@@ -7,7 +7,8 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
@@ -18,5 +19,13 @@
     "@aws-sdk/lib-dynamodb": "^3.848.0",
     "aws-sdk": "^2.1692.0",
     "express": "^5.1.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/balu-bunny/Project-BR.git"
+  },
+  "bugs": {
+    "url": "https://github.com/balu-bunny/Project-BR/issues"
+  },
+  "homepage": "https://github.com/balu-bunny/Project-BR#readme"
 }
