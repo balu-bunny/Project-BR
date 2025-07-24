@@ -28,7 +28,9 @@ exports.handleLogin =  (req, res) => {
   console.log('Handling login for org:'+orgId);
   console.log(orgId);
 
-  const login = spawn('sf', ['org', 'login', 'device', '--alias', orgId]);
+  const login = spawn('sf', ['org', 'login', 'device', '--alias', orgId], {
+    shell: true
+  });//warning! remove shell: true once UI is developed 
 
   let output = '';
 
