@@ -30,9 +30,9 @@ console.log('Usage: node call-api.js '+orgId+'---'+endpoint+'---'+method);
         params: { orgId }
       });
     }else if(method.toUpperCase() === 'POST') {
-        console.log('Type is required for POST method');
+        console.log('Type is required for POST method'+orgId);
         response = await axios.post(endpointURL, {
-        orgId
+        params: { orgId }
         });
     }
 

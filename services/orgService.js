@@ -21,34 +21,44 @@ exports.fetchOrgList = () => {
   });
 };
 
-exports.handleLogin = (req, res) => {
-  console.log('Handling login for org:');
-  const { orgId } = req.body;
-  console.log('Handling login for org:', req.body);
+exports.handleLogin =  (req, res) => {
+  console.log('Handling login for org:'+req.body);
+  const { orgId, type } = req.body.params || {};
+
+  console.log('Handling login for org:'+orgId);
+  console.log(orgId);
 
   const login = spawn('sf', ['org', 'login', 'device', '--alias', orgId]);
-  console.log(login);
+
   let output = '';
-  let responded = false;
+
+  let responseSent = true; // <-- Declare it here
+
 
   login.stdout.on('data', (data) => {
     const message = data.toString();
+    console.log(`stdout: ${message}`);
     output += message;
-    if (!responded) {
-      res.json({ message: 'Follow instructions to login', output: message });
-      responded = true;
+
+    if (!responseSent) {
+      // send only once
+      res.json({ message: `Follow instructions to login`, output: message });
+      //
     }
+    responseSent = false;
   });
 
-  login.stderr.on('data', (data) => console.error(`stderr: ${data}`));
+  login.stderr.on('data', (data) => {
+    console.error(`stderr: ${data}`); 
+  });
 
   login.on('close', (code) => {
-    if (!responded) {
-      res.status(code === 0 ? 200 : 500).json({
-        message: code === 0 ? `Login output for ${orgId}` : `Login failed with code ${code}`,
-        output,
-      });
-      responded = true;
+    console.log(`Process exited with code ${code}`);
+    if (code === 0) {
+      res.json({ message: `Login output for ${orgId}`, output });
+    } else {
+      res.status(500).json({ error: `Login failed with code ${code}`, output });
     }
   });
 };
+
