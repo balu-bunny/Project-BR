@@ -44,7 +44,7 @@ exports.handleLogin =  (req, res) => {
 
     if (!responseSent) {
       // send only once
-      res.json({ message: `Follow instructions to login`, output: message });
+      res.json({ message: `Follow instructions to login`, output: output });
       //
     }
     responseSent = false;
