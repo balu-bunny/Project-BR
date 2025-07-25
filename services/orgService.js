@@ -1,4 +1,4 @@
-const { exec, spawn } = require('child_process');
+const { exec, spawn } = require('./processWrapper');
 
 exports.fetchOrgList = () => {
   return new Promise((resolve, reject) => {

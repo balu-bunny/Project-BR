@@ -1,4 +1,4 @@
-const { exec } = require('child_process');
+const { exec } = require('./processWrapper');
 const { randomUUID } = require('crypto');
 const workItemModel = require('../models/workItemModel');
 

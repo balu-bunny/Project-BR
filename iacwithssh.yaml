@@ -59,12 +59,12 @@ Conditions:
   DeleteDynamo: !Equals [!Ref DynamoDeletionPolicy, Delete]
   DeleteCognito: !Equals [!Ref CognitoDeletionPolicy, Delete]
 Resources:
-  QPMSDynamoDBTable:
+  QPMSDynamoJOBStatusTable:
     Type: AWS::DynamoDB::Table
     Metadata:
       AWS::CloudFormation::DeletionPolicy: !If [DeleteDynamo, Delete, Retain]
     Properties:
-      TableName: JobTable
+      TableName: !Sub 'JobStatusTable-${AWS::StackName}'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -75,6 +75,44 @@ Resources:
       Tags:
         - Key: Name
           Value: QPMSAppTable
+
+  QPMSDynamoProcessTable:
+      Type: AWS::DynamoDB::Table
+      Metadata:
+        AWS::CloudFormation::DeletionPolicy: !If [DeleteDynamo, Delete, Retain]
+      Properties:
+        TableName: !Sub 'ProcessLogTable-${AWS::StackName}'
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: PID
+            AttributeType: N
+          - AttributeName: Type
+            AttributeType: S
+          - AttributeName: CreatedAt
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: ByType
+            KeySchema:
+              - AttributeName: Type
+                KeyType: HASH
+              - AttributeName: CreatedAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: ByPID
+            KeySchema:
+              - AttributeName: PID
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        Tags:
+          - Key: Name
+            Value: QPMSProcessTable
   QPMSUserPool:
     Type: AWS::Cognito::UserPool
     Metadata:
@@ -335,10 +373,14 @@ Outputs:
     Description: The name of the created S3 bucket
     Value: !Ref QPMSS3Bucket
 
-  DynamoDBTableName:
+  JOBStatusTableName:
     Description: The name of the created DynamoDB table
-    Value: !Ref QPMSDynamoDBTable
+    Value: !Ref QPMSDynamoJOBStatusTable
 
+  ProcessTableName:
+    Description: The name of the created DynamoDB table
+    Value: !Ref QPMSDynamoProcessTable
+    
   SecurityGroupId:
     Description: The ID of the security group created for the EC2 instance
     Value: !Ref QPMSSecurityGroup
