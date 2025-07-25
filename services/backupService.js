@@ -1,4 +1,4 @@
-const { exec } = require('./processWrapper');
+const { exec } = require('../util/processWrapper');
 const { randomUUID } = require('crypto');
 const workItemModel = require('../models/workItemModel');
 

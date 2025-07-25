@@ -1,4 +1,4 @@
-const { exec, spawn } = require('./processWrapper');
+const { exec, spawn } = require('../util/processWrapper');
 
 exports.fetchOrgList = () => {
   return new Promise((resolve, reject) => {
