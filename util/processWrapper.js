@@ -3,7 +3,7 @@ const { DynamoDBClient, PutItemCommand } = require('@aws-sdk/client-dynamodb');
 const { v4: uuidv4 } = require('uuid');
 
 const client = new DynamoDBClient({ region: 'us-east-1' }); // ✅ Adjust region
-const TABLE_NAME = 'ProcessTracker'; // ✅ Replace with your DynamoDB table name
+const TABLE_NAME = 'ProcessLogTable-BackUpAndRestore'; // ✅ Replace with your DynamoDB table name
 
 // Log to DynamoDB
 async function logToDynamo({ pid, command, type }) {

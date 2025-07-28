@@ -1,0 +1,17 @@
+ aws dynamodb put-item  --table-name ProcessTracker  --item '{
+    PK: { S: 'PROCESS#${id}' },
+    PID: { N: 1231231231 },
+    Command: { S: 'command' },
+    Type: { S: 'type' },
+    CreatedAt: { S: 'new Date().toISOString()' }
+  }'
+
+
+aws dynamodb put-item --table-name ProcessLogTable-BackUpAndRestore --item "{\"PK\": {\"S\": \"PROCESS#001\"}, \"PID\": {\"N\": \"1231231231\"}, \"Command\": {\"S\": \"my-command\"}, \"Type\": {\"S\": \"batch\"}, \"CreatedAt\": {\"S\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}}"
+
+
+node -e "fetch('http://localhost:3000/api/orgs').then(res => res.json()).then(console.log)"
+
+
+node -e "fetch('http://localhost:3000/api/orgs').then(res => res.json()).then(console.log)"
+node connection.js POST addNewOrg bo
