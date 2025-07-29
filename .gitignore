@@ -1,2 +1,4 @@
 /node_modules
 /QPMS-AWS.pem
+/ac.json
+/dynamoDbSchema.yaml

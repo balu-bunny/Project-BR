@@ -1,10 +1,13 @@
-const dynamo = require('../config/aws');
+// insertWorkItem.js
+const { dynamo } = require('../config/aws');
+const { PutCommand } = require('@aws-sdk/lib-dynamodb');
 
-exports.insertWorkItem = (params) => {
-  return new Promise((resolve, reject) => {
-    dynamo.put(params, (err, data) => {
-      if (err) reject(err);
-      else resolve(data);
-    });
-  });
+exports.insertWorkItem = async (params) => {
+  try {
+    const command = new PutCommand(params);
+    const data = await dynamo.send(command);
+    return data;
+  } catch (err) {
+    throw err;
+  }
 };
