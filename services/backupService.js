@@ -8,10 +8,10 @@ exports.processBackup = (req, res) => {
   const id = randomUUID();
 
   const baseParams = {
-    TableName: "WorkItems",
+    TableName: "JobStatusTable-BackUpAndRestore",
     Item: {
       id,
-      name: "backup",
+      PID: "backup",
       object: objectName
     }
   };

@@ -69,9 +69,30 @@ Resources:
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
+        - AttributeName: object
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: PID
+          AttributeType: S 
       KeySchema:
         - AttributeName: id
           KeyType: HASH
+      GlobalSecondaryIndexes:
+          - IndexName: ByType
+            KeySchema:
+              - AttributeName: object
+                KeyType: HASH
+              - AttributeName: status
+                KeyType: RANGE  
+            Projection:
+              ProjectionType: ALL
+          - IndexName: ByPID
+            KeySchema:
+              - AttributeName: PID
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
       Tags:
         - Key: Name
           Value: QPMSAppTable

@@ -8,13 +8,16 @@
 
 
 aws dynamodb put-item --table-name ProcessLogTable-BackUpAndRestore --item "{\"PK\": {\"S\": \"PROCESS#001\"}, \"PID\": {\"N\": \"1231231231\"}, \"Command\": {\"S\": \"my-command\"}, \"Type\": {\"S\": \"batch\"}, \"CreatedAt\": {\"S\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}}"
+aws dynamodb put-item \
+  --table-name JobStatusTable-BackUpAndRestore \
+  --item "{\"id\": {\"S\": \"PROCESS#001\"}, \"object\": {\"S\": \"1231231231\"}, \"PID\": {\"S\": \"my-command\"}, \"status\": {\"S\": \"batch\"}}"
 
 
 node -e "fetch('http://localhost:3000/api/orgs').then(res => res.json()).then(console.log)"
 
 
 node -e "fetch('http://localhost:3000/api/orgs').then(res => res.json()).then(console.log)"
-node connection.js POST addNewOrg bo
+node connection.js POST addNewOrg source
 
 
-node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['Account'], orgId:'int2' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
+node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['Account'], orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
