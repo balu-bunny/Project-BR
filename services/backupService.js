@@ -44,7 +44,7 @@ exports.processBackup = (req, res) => {
 
 try{
   // Count the records first
-  const countCommand = `sf data query --query "${countQuery}" --output-file export-${objectName}-${now}.csv --wait 10 --target-org ${orgId} && aws s3 mv export-${objectName}-${now}.csv s3://myapp-bucket-us-east-1-767900165297/${orgId}/${objectName}/`;
+  const countCommand = `sf data query --query "${countQuery}" --json --target-org ${orgId}`;
 
   const countOutput = execSync(countCommand, { encoding: 'utf-8' });
   const result = JSON.parse(countOutput);
