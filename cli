@@ -16,7 +16,7 @@ aws dynamodb put-item \
 
 sudo bash -c 'nohup node app.js > app.log 2>&1 &'
 
-
+cd Project-BR
 node -e "fetch('http://localhost:3000/api/orgs').then(res => res.json()).then(console.log)"
 node connection.js POST addNewOrg source
 

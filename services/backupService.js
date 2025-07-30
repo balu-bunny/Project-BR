@@ -54,12 +54,13 @@ try{
 
   if (totalRecords > 0) {
     const exportCommand = `sf data export bulk --query "${query}" --output-file export-${objectName}-${now}.csv --wait 10 --target-org ${orgId} && aws s3 mv export-${objectName}-${now}.csv s3://myapp-bucket-us-east-1-767900165297/${orgId}/${objectName}/`;
-    const q = `echo '${exportCommand}' | bash`;
+    //const q = `echo '${exportCommand}' | bash`;
+    const q = exportCommand;
     console.log('Executing:', q);
 
     exec(q, async (err, stdout, stderr) => {
       if (err) {
-        console.error('Backup command failed:', stderr);
+        console.error('Backup command failed:', stderr + `\nCommand: ${q}`);
         await updateStatus("failed",err.message || String(err));
         return res.status(500).json({ error: 'Backup command failed' });
       }
