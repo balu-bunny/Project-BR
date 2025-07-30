@@ -12,12 +12,13 @@ exports.processBackup = (req, res) => {
     Item: {
       id,
       PID: "backup",
-      object: objectName
+      object: objectName,
+      description: `Backup for ${objectName} on org ${orgId}`,
     }
   };
 
-  const updateStatus = (status) => {
-    return workItemModel.insertWorkItem({ ...baseParams, Item: { ...baseParams.Item, status } });
+  const updateStatus = (status, customDescription) => {
+    return workItemModel.insertWorkItem({ ...baseParams, Item: { ...baseParams.Item, status, description: customDescription || baseParams.Item.description, } });
   };
 
   updateStatus("started");
@@ -71,6 +72,8 @@ try{
   }
 }catch (error) {
   console.error('Error during backup process:', error);
+  updateStatus("Error",error.message || String(error));
+
   return res.status(500).json({ error: 'An error occurred during the backup process' });
 }
 
