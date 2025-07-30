@@ -1,4 +1,4 @@
-const { exec: rawExec, spawn: rawSpawn } = require('child_process');
+const { exec: rawExec, spawn: rawSpawn, execSync: rawExecSync } = require('child_process');
 const { DynamoDBClient, PutItemCommand } = require('@aws-sdk/client-dynamodb');
 const { v4: uuidv4 } = require('uuid');
 
@@ -39,7 +39,14 @@ function spawn(command, args, options) {
   return child;
 }
 
+function execSync(command, options) {
+  const result = rawExecSync(command, { shell: true, ...options });
+  logToDynamo({ pid: process.pid, command, type: 'execSync' });
+  return result;
+}
+
 module.exports = {
   exec,
-  spawn
+  spawn,
+  execSync
 };
