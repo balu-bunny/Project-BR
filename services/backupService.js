@@ -22,7 +22,9 @@ exports.processBackup = (req, res) => {
 
   updateStatus("started");
 
-  const q = `sf data export bulk --query 'SELECT Id, Name FROM ${objectName}' --output-file export-${objectName}.csv --wait 10 --target-org ${orgId}`;
+  //const q = `sf data export bulk --query 'SELECT Id, Name FROM ${objectName}' --output-file export-${objectName}.csv --wait 10 --target-org ${orgId}`;
+  const q = `sf data export bulk --query "SELECT Id, Name FROM ${objectName}" --output-file export-${objectName}-$(date +%Y-%m-%d).csv --wait 10 --target-org ${orgId}  && aws s3 mv export-${objectName}-$(date +%Y-%m-%d).csv s3://myapp-bucket-us-east-1-767900165297/${orgId}/${objectName}`;
+
   console.log('Executing:', q);
 
   exec(q, async (err, stdout, stderr) => {
