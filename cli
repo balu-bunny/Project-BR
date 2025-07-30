@@ -13,7 +13,7 @@ aws dynamodb put-item \
   --item "{\"id\": {\"S\": \"PROCESS#001\"}, \"object\": {\"S\": \"1231231231\"}, \"PID\": {\"S\": \"my-command\"}, \"status\": {\"S\": \"batch\"}}"
 
 
-node -e "fetch('http://localhost:3000/api/orgs').then(res => res.json()).then(console.log)"
+
 
 
 node -e "fetch('http://localhost:3000/api/orgs').then(res => res.json()).then(console.log)"
