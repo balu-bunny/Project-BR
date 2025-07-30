@@ -60,7 +60,7 @@ try{
     exec(q, async (err, stdout, stderr) => {
       if (err) {
         console.error('Backup command failed:', stderr);
-        await updateStatus("failed");
+        await updateStatus("failed",err.message || String(err));
         return res.status(500).json({ error: 'Backup command failed' });
       }
 
