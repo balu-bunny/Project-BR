@@ -28,7 +28,7 @@ exports.processBackup = (req, res) => {
   let query = `SELECT Id, Name FROM ${objectName}`;
 
   let countQuery = `SELECT Count() FROM ${objectName}`;
-  const now = `$(date +%Y-%m-%d_%H-%M-%S)`;
+  const now = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
   let clause = '';
 
   if (backupType === 'Daily') {
