@@ -3,3 +3,7 @@
 
 
 #npm install @aws-sdk/client-s3 @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+
+
+
+working release
