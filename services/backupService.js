@@ -9,7 +9,7 @@ exports.processBackup = (req, res) => {
     let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId}`;
     const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
     const objectsResult = JSON.parse(cloudQueryOutput);
-    const  = objectsResult.result;
+    const totalobjects = objectsResult.result;
     if(totalobjects.length>0){
       totalobjects.forEach(function(r){
           processBackup({
