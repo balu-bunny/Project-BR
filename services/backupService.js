@@ -4,6 +4,30 @@ const workItemModel = require('../models/workItemModel');
 
 exports.processBackup = (req, res) => {
   const { orgId, objects, cloud, backupType  } = req.body;
+
+  if(cloud!=undefined&&cloud!=''){
+    let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId}`;
+    const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
+    const objectsResult = JSON.parse(cloudQueryOutput);
+    const  = objectsResult.result;
+    if(totalobjects.length>0){
+      totalobjects.forEach(function(r){
+          processBackup({
+            body: {
+              orgId,
+              objects: [r],
+              backupType
+            }
+          });
+        console.log(r)
+
+      });
+
+      return;
+    }
+  }
+
+
   const objectName = objects[0];
   const id = randomUUID();
 
@@ -22,6 +46,10 @@ exports.processBackup = (req, res) => {
   };
 
   updateStatus("started");
+
+
+
+  
 
   //const q = `sf data export bulk --query 'SELECT Id, Name FROM ${objectName}' --output-file export-${objectName}.csv --wait 10 --target-org ${orgId}`;
   
