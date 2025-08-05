@@ -8,7 +8,7 @@ exports.processBackup = (req, res) => {
   const { orgId, objects, cloud, backupType  } = req.body;
 
   if(cloud!=undefined&&cloud!=''){
-    let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId}`;
+    let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId} --json`;
     const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
     const objectsResult = JSON.parse(cloudQueryOutput);
     const totalobjects = objectsResult.result;
@@ -105,9 +105,9 @@ try{
   console.error('Error during backup process:', error);
   updateStatus("Error",error.message || String(error));
 
-  return res.status(500).json({ error: 'An error occurred during the backup process' });
+  return res.status(500).json({ error: 'An error occurred during the backup process' }) ;
 }
-  } catch (error) {
+  }catch (error) {
     updateStatus("Error",error.message || String(error));
     console.error('Error in processBackup:', error);
     return res.status(500).json({ error: 'An error occurred during the backup process' });
