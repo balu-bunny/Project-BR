@@ -6,12 +6,18 @@ exports.processBackup = (req, res) => {
 
   try{
   const { orgId, objects, cloud, backupType  } = req.body;
+  updateStatus("processBackup started", `Processing backup for org ${orgId} with backupType ${backupType}`);
 
   if(cloud!=undefined&&cloud!=''){
     let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId} --json`;
     const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
+          updateStatus("processBackup cloudQueryOutput",String(cloudQueryOutput));
     const objectsResult = JSON.parse(cloudQueryOutput);
+          updateStatus("processBackup started",String(objectsResult));
+
     const totalobjects = objectsResult.result;
+          updateStatus("processBackup started",`Total objects found: ${totalobjects.length}`);
+
     if(totalobjects.length>0){
       totalobjects.forEach(function(r){
           processBackup({
