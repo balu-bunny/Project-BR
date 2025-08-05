@@ -19,7 +19,7 @@ function processBackup(req, res) {
 
   if (cloud !== undefined && cloud !== '') {
     try {
-      const cloudQuery = `sf sobject list --sobject custom -o ${orgId} --json`;
+      const cloudQuery = `sf sobject list --sobject custom -o  ${orgId} --json`;
       const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
         console.log(cloudQueryOutput);
       const objectsResult = JSON.parse(cloudQueryOutput);

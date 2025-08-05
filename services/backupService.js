@@ -12,6 +12,7 @@ exports.processBackup = (req, res) => {
     let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId} --json`;
     const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
           updateStatus("processBackup cloudQueryOutput",String(cloudQueryOutput));
+          return res.json({ message: `Cloud query output for ${orgId}`, output: cloudQueryOutput });
     const objectsResult = JSON.parse(cloudQueryOutput);
           updateStatus("processBackup started",String(objectsResult));
 
