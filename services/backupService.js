@@ -3,6 +3,8 @@ const { randomUUID } = require('crypto');
 const workItemModel = require('../models/workItemModel');
 
 exports.processBackup = (req, res) => {
+
+  try{
   const { orgId, objects, cloud, backupType  } = req.body;
 
   if(cloud!=undefined&&cloud!=''){
@@ -105,7 +107,11 @@ try{
 
   return res.status(500).json({ error: 'An error occurred during the backup process' });
 }
-
+  } catch (error) {
+    updateStatus("Error",error.message || String(error));
+    console.error('Error in processBackup:', error);
+    return res.status(500).json({ error: 'An error occurred during the backup process' });
+  }
 
 
 };
