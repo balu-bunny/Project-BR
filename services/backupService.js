@@ -4,6 +4,9 @@ const workItemModel = require('../models/workItemModel');
 
 exports.processBackup = (req, res) => {
 
+  const updateStatus = (status, customDescription) => {
+    return workItemModel.insertWorkItem({ ...baseParams, Item: { ...baseParams.Item, status, description: customDescription || baseParams.Item.description, } });
+  };
   try{
   const { orgId, objects, cloud, backupType  } = req.body;
   updateStatus("processBackup started", `Processing backup for org ${orgId} with backupType ${backupType}`);
@@ -50,9 +53,6 @@ exports.processBackup = (req, res) => {
     }
   };
 
-  const updateStatus = (status, customDescription) => {
-    return workItemModel.insertWorkItem({ ...baseParams, Item: { ...baseParams.Item, status, description: customDescription || baseParams.Item.description, } });
-  };
 
   updateStatus("started");
 
