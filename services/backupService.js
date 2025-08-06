@@ -9,35 +9,35 @@ exports.processBackup = (req, res) => {
   };
   try{
   const { orgId, objects, cloud, backupType  } = req.body;
-  updateStatus("processBackup started", `Processing backup for org ${orgId} with backupType ${backupType}`);
+  //updateStatus("processBackup started", `Processing backup for org ${orgId} with backupType ${backupType}`);
 
-  if(cloud!=undefined&&cloud!=''){
-    let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId} --json`;
-    const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
-          updateStatus("processBackup cloudQueryOutput",String(cloudQueryOutput));
-          return res.json({ message: `Cloud query output for ${orgId}`, output: cloudQueryOutput });
-    const objectsResult = JSON.parse(cloudQueryOutput);
-          updateStatus("processBackup started",String(objectsResult));
+  // if(cloud!=undefined&&cloud!=''){
+  //   let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId} --json`;
+  //   const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
+  //         updateStatus("processBackup cloudQueryOutput",String(cloudQueryOutput));
+  //         return res.json({ message: `Cloud query output for ${orgId}`, output: cloudQueryOutput });
+  //   const objectsResult = JSON.parse(cloudQueryOutput);
+  //         updateStatus("processBackup started",String(objectsResult));
 
-    const totalobjects = objectsResult.result;
-          updateStatus("processBackup started",`Total objects found: ${totalobjects.length}`);
+  //   const totalobjects = objectsResult.result;
+  //         updateStatus("processBackup started",`Total objects found: ${totalobjects.length}`);
 
-    if(totalobjects.length>0){
-      totalobjects.forEach(function(r){
-          processBackup({
-            body: {
-              orgId,
-              objects: [r],
-              backupType
-            }
-          });
-        console.log(r)
+  //   if(totalobjects.length>0){
+  //     totalobjects.forEach(function(r){
+  //         processBackup({
+  //           body: {
+  //             orgId,
+  //             objects: [r],
+  //             backupType
+  //           }
+  //         });
+  //       console.log(r)
 
-      });
+  //     });
 
-      return;
-    }
-  }
+  //     return;
+  //   }
+  // }
 
 
   const objectName = objects[0];
