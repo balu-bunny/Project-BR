@@ -4,7 +4,7 @@ const workItemModel = require('../models/workItemModel');
 const processBackup = (req, res) => {
   console.log('Processing backup request:', req.body);
   console.log('started');
-  try{
+  
   const { orgId, objects, cloud, backupType  } = req.body;
   const id = randomUUID();
   const objectName = objects[0];
@@ -22,9 +22,9 @@ const processBackup = (req, res) => {
     console.log(`Updating status: ${status}`,customDescription);
     baseParams.Item.status = status;
     baseParams.Item.description = customDescription || baseParams.Item.description;
-    return ;
-    //return workItemModel.insertWorkItem({ ...baseParams, Item: { ...baseParams.Item, status, description: customDescription || baseParams.Item.description, } });
+    return workItemModel.insertWorkItem({ ...baseParams, Item: { ...baseParams.Item, status, description: customDescription || baseParams.Item.description, } });
   };
+  try{
   updateStatus("processBackup started", `Processing backup for org ${orgId} with backupType ${backupType}`);
 
   if(cloud!=undefined&&cloud!=''){
@@ -135,7 +135,7 @@ try{
   return res.status(500).json({ error: 'An error occurred during the backup process' }) ;
 }
   }catch (error) {
-    //updateStatus("Error",error.message || String(error));
+    updateStatus("Error",error.message || String(error));
     console.error('Error in processBackup:', error);
     return res.status(500).json({ error: 'An error occurred during the backup process' });
   }
