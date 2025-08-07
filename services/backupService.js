@@ -1,47 +1,13 @@
 const { exec, execSync } = require('../util/processWrapper');
 const { randomUUID } = require('crypto');
 const workItemModel = require('../models/workItemModel');
-
-exports.processBackup = (req, res) => {
-
-  const updateStatus = (status, customDescription) => {
-    return workItemModel.insertWorkItem({ ...baseParams, Item: { ...baseParams.Item, status, description: customDescription || baseParams.Item.description, } });
-  };
+const processBackup = (req, res) => {
+  console.log('Processing backup request:', req.body);
+  console.log('started');
   try{
   const { orgId, objects, cloud, backupType  } = req.body;
-  //updateStatus("processBackup started", `Processing backup for org ${orgId} with backupType ${backupType}`);
-
-  // if(cloud!=undefined&&cloud!=''){
-  //   let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId} --json`;
-  //   const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
-  //         updateStatus("processBackup cloudQueryOutput",String(cloudQueryOutput));
-  //         return res.json({ message: `Cloud query output for ${orgId}`, output: cloudQueryOutput });
-  //   const objectsResult = JSON.parse(cloudQueryOutput);
-  //         updateStatus("processBackup started",String(objectsResult));
-
-  //   const totalobjects = objectsResult.result;
-  //         updateStatus("processBackup started",`Total objects found: ${totalobjects.length}`);
-
-  //   if(totalobjects.length>0){
-  //     totalobjects.forEach(function(r){
-  //         processBackup({
-  //           body: {
-  //             orgId,
-  //             objects: [r],
-  //             backupType
-  //           }
-  //         });
-  //       console.log(r)
-
-  //     });
-
-  //     return;
-  //   }
-  // }
-
-
-  const objectName = objects[0];
   const id = randomUUID();
+  const objectName = objects[0];
 
   const baseParams = {
     TableName: "JobStatusTable-BackUpAndRestore",
@@ -52,6 +18,52 @@ exports.processBackup = (req, res) => {
       description: `Backup for ${objectName} on org ${orgId}`,
     }
   };
+  const updateStatus = (status, customDescription) => {
+    console.log(`Updating status: ${status}`,customDescription);
+    baseParams.Item.status = status;
+    baseParams.Item.description = customDescription || baseParams.Item.description;
+    return ;
+    //return workItemModel.insertWorkItem({ ...baseParams, Item: { ...baseParams.Item, status, description: customDescription || baseParams.Item.description, } });
+  };
+  updateStatus("processBackup started", `Processing backup for org ${orgId} with backupType ${backupType}`);
+
+  if(cloud!=undefined&&cloud!=''){
+    let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId} --json`;
+    const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
+    console.log('Cloud Query Output:', cloudQueryOutput);
+          updateStatus("processBackup cloudQueryOutput",String(cloudQueryOutput));
+    const objectsResult = JSON.parse(cloudQueryOutput);
+          updateStatus("processBackup started",String(objectsResult));
+
+    const totalobjects = objectsResult.result;
+        console.log('Cloud Query Output:', objectsResult.result);
+
+          updateStatus("processBackup started",`Total objects found: ${totalobjects.length}`);
+
+    if(totalobjects.length>0){
+      console.log('Total objects found: inside');
+      totalobjects.forEach(function(r){
+              console.log('Total objects found: inside :', r);
+
+          processBackup({
+            body: {
+              orgId,
+              objects: [r],
+              backupType
+            }
+          });
+        console.log(r)
+
+      });
+
+      return;
+    }
+  }
+
+
+  if(objectName.endsWith('__b') ) {
+    return;
+  }
 
 
   updateStatus("started");
@@ -62,7 +74,15 @@ exports.processBackup = (req, res) => {
 
   //const q = `sf data export bulk --query 'SELECT Id, Name FROM ${objectName}' --output-file export-${objectName}.csv --wait 10 --target-org ${orgId}`;
   
-  let query = `SELECT Id, Name FROM ${objectName}`;
+  let objectFieldCommaSeparated ='';
+
+  const objectFieldsOutput = execSync(`sf sobject describe --sobject ${objectName}  --target-org ${orgId} --json`, { encoding: 'utf-8' });
+
+  const objectFields = JSON.parse(objectFieldsOutput);
+  const fieldNames = objectFields.result.fields.map(field => field.name);
+  objectFieldCommaSeparated = fieldNames.join(',');
+
+  let query = `SELECT ${objectFieldCommaSeparated} FROM ${objectName}`;
 
   let countQuery = `SELECT Count() FROM ${objectName}`;
   const now = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
@@ -90,7 +110,7 @@ try{
   console.log(`Record count: ${totalRecords}`);
 
   if (totalRecords > 0) {
-    const exportCommand = `sf data export bulk --query "${query}" --output-file export-${objectName}-${now}.csv --wait 10 --target-org ${orgId} && aws s3 mv export-${objectName}-${now}.csv s3://myapp-bucket-us-east-1-767900165297/${orgId}/${objectName}/`;
+    const exportCommand = `sf data export bulk --query "${query}" --output-file export-${objectName}-${now}.csv --wait 10000 --target-org ${orgId} && aws s3 mv export-${objectName}-${now}.csv s3://myapp-bucket-us-east-1-767900165297/${orgId}/${objectName}/`;
     //const q = `echo '${exportCommand}' | bash`;
     const q = exportCommand;
     console.log('Executing:', q);
@@ -115,10 +135,11 @@ try{
   return res.status(500).json({ error: 'An error occurred during the backup process' }) ;
 }
   }catch (error) {
-    updateStatus("Error",error.message || String(error));
+    //updateStatus("Error",error.message || String(error));
     console.error('Error in processBackup:', error);
     return res.status(500).json({ error: 'An error occurred during the backup process' });
   }
 
 
 };
+exports.processBackup = processBackup;
