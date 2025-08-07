@@ -61,7 +61,7 @@ const processBackup = (req, res) => {
   }
 
 
-  if(objectName.endsWith('__b') ) {
+  if(objectName.endsWith('__x')||objectName.endsWith('__b')||objectName.endsWith('__e') ) {
     return;
   }
 
@@ -127,6 +127,9 @@ try{
 
       res.json({ message: `Backup for ${objectName} started on org ${orgId}` });
     });
+
+
+    //execSync(q, { encoding: 'utf-8' });
   }
 }catch (error) {
   console.error('Error during backup process:', error);
