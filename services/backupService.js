@@ -1,7 +1,7 @@
 const { exec, execSync } = require('../util/processWrapper');
 const { randomUUID } = require('crypto');
 const workItemModel = require('../models/workItemModel');
-const processBackup = (req, res) => {
+const processBackup = async  (req, res) => {
   console.log('Processing backup request:', req.body);
   console.log('started');
   
@@ -18,28 +18,22 @@ const processBackup = (req, res) => {
       description: `Backup for ${objectName} on org ${orgId}`,
     }
   };
-  const updateStatus = (status, customDescription) => {
+  const updateStatus = async (status, customDescription) => {
+    debugger;
     console.log(`Updating status: ${status}`,customDescription);
     baseParams.Item.status = status;
     baseParams.Item.description = customDescription || baseParams.Item.description;
     return workItemModel.insertWorkItem({ ...baseParams, Item: { ...baseParams.Item, status, description: customDescription || baseParams.Item.description, } });
   };
   try{
-  updateStatus("processBackup started", `Processing backup for org ${orgId} with backupType ${backupType}`);
-
   if(cloud!=undefined&&cloud!=''){
+    await updateStatus("processBackup started", `Processing backup for org ${orgId} ${cloud ? ` on cloud ${cloud}` : ` on objectName ${objectName}`}`);
     let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId} --json`;
     const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
     console.log('Cloud Query Output:', cloudQueryOutput);
-          updateStatus("processBackup cloudQueryOutput",String(cloudQueryOutput));
     const objectsResult = JSON.parse(cloudQueryOutput);
-          updateStatus("processBackup started",String(objectsResult));
-
     const totalobjects = objectsResult.result;
         console.log('Cloud Query Output:', objectsResult.result);
-
-          updateStatus("processBackup started",`Total objects found: ${totalobjects.length}`);
-
     if(totalobjects.length>0){
       console.log('Total objects found: inside');
       totalobjects.forEach(function(r){
@@ -66,7 +60,7 @@ const processBackup = (req, res) => {
   }
 
 
-  updateStatus("started");
+  await updateStatus("processBackup started", `Processing backup for org ${orgId} ${cloud ? ` on cloud ${cloud}` : ` on objectName ${objectName}`}`);
 
 
 
@@ -133,12 +127,12 @@ try{
   }
 }catch (error) {
   console.error('Error during backup process:', error);
-  updateStatus("Error",error.message || String(error));
+  await updateStatus("Error",error.message || String(error));
 
   return res.status(500).json({ error: 'An error occurred during the backup process' }) ;
 }
   }catch (error) {
-    updateStatus("Error",error.message || String(error));
+    await updateStatus("Error",error.message || String(error));
     console.error('Error in processBackup:', error);
     return res.status(500).json({ error: 'An error occurred during the backup process' });
   }
