@@ -1,13 +1,20 @@
+// backupController.js
 const { exec, execSync } = require('../util/processWrapper');
 const { randomUUID } = require('crypto');
 const workItemModel = require('../models/workItemModel');
-const processBackup = async  (req, res) => {
-  console.log('Processing backup request:', req.body);
-  console.log('started');
-  
-  const { orgId, objects, cloud, backupType  } = req.body;
+
+// Use env vars to be EC2-safe and portable
+const S3_BUCKET = 'myapp-bucket-us-east-1-767900165297';//process.env.S3_BUCKET;
+const AWS_REGION = 'us-east-1';//process.env.AWS_REGION;
+
+const isPlatformEvent = (objectName) => {
+  return objectName.endsWith('__x') || objectName.endsWith('__b') || objectName.endsWith('__e');
+};
+
+// Core backup logic separated for reusability
+async function performBackup({ orgId, objectName, backupType }) {
   const id = randomUUID();
-  const objectName = objects[0];
+  const timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
 
   const baseParams = {
     TableName: "JobStatusTable-BackUpAndRestore",
@@ -18,125 +25,112 @@ const processBackup = async  (req, res) => {
       description: `Backup for ${objectName} on org ${orgId}`,
     }
   };
+
   const updateStatus = async (status, customDescription) => {
-    debugger;
-    console.log(`Updating status: ${status}`,customDescription);
+    console.log(`Updating status: ${status}`, customDescription);
     baseParams.Item.status = status;
     baseParams.Item.description = customDescription || baseParams.Item.description;
-    return workItemModel.insertWorkItem({ ...baseParams, Item: { ...baseParams.Item, status, description: customDescription || baseParams.Item.description, } });
+    return workItemModel.insertWorkItem({
+      ...baseParams,
+      Item: {
+        ...baseParams.Item,
+        status,
+        description: customDescription || baseParams.Item.description
+      }
+    });
   };
-  try{
-  if(cloud!=undefined&&cloud!=''){
-    await updateStatus("processBackup started", `Processing backup for org ${orgId} ${cloud ? ` on cloud ${cloud}` : ` on objectName ${objectName}`}`);
-    let cloudQuery = ` sf sobject list --sobject custom -o  ${orgId} --json`;
-    const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
-    console.log('Cloud Query Output:', cloudQueryOutput);
-    const objectsResult = JSON.parse(cloudQueryOutput);
-    const totalobjects = objectsResult.result;
-        console.log('Cloud Query Output:', objectsResult.result);
-    if(totalobjects.length>0){
-      console.log('Total objects found: inside');
-      totalobjects.forEach(function(r){
-              console.log('Total objects found: inside :', r);
 
-          processBackup({
-            body: {
-              orgId,
-              objects: [r],
-              backupType
-            }
-          });
-        console.log(r)
-
-      });
-
+  try {
+    if (isPlatformEvent(objectName)) {
+      console.log(`Skipping platform event or binary object: ${objectName}`);
       return;
     }
-  }
 
+    await updateStatus("started", `Backup for ${objectName} on ${orgId}`);
 
-  if(objectName.endsWith('__x')||objectName.endsWith('__b')||objectName.endsWith('__e') ) {
-    return;
-  }
+    const objectFieldsOutput = execSync(`sf sobject describe --sobject ${objectName} --target-org ${orgId} --json`, { encoding: 'utf-8' });
+    const objectFields = JSON.parse(objectFieldsOutput);
+    const fieldNames = objectFields.result.fields.map(field => field.name);
+    const objectFieldCommaSeparated = fieldNames.join(',');
 
+    let query = `SELECT ${objectFieldCommaSeparated} FROM ${objectName}`;
+    let countQuery = `SELECT Count() FROM ${objectName}`;
+    let clause = '';
 
-  await updateStatus("processBackup started", `Processing backup for org ${orgId} ${cloud ? ` on cloud ${cloud}` : ` on objectName ${objectName}`}`);
+    if (backupType === 'Daily') clause += ` WHERE LastModifiedDate = TODAY`;
+    else if (backupType === 'Differential') clause += ` WHERE LastModifiedDate >= LAST_N_DAYS:7`;
+    else if (backupType === 'Incremental') clause += ` WHERE LastModifiedDate >= YESTERDAY`;
 
+    query += clause;
+    countQuery += clause;
 
+    const countCommand = `sf data query --query "${countQuery}" --json --target-org ${orgId}`;
+    const countOutput = execSync(countCommand, { encoding: 'utf-8' });
+    const totalRecords = JSON.parse(countOutput).result.totalSize;
 
-  
+    console.log(`[${objectName}] Record count: ${totalRecords}`);
+    if (totalRecords === 0) {
+      await updateStatus("skipped", `No records found for ${objectName}`);
+      return;
+    }
 
-  //const q = `sf data export bulk --query 'SELECT Id, Name FROM ${objectName}' --output-file export-${objectName}.csv --wait 10 --target-org ${orgId}`;
-  
-  let objectFieldCommaSeparated ='';
+    const fileName = `export-${objectName}-${timestamp}.csv`;
+    const exportCommand = `sf data export bulk --query "${query}" --output-file ${fileName} --wait 10000 --target-org ${orgId}`;
+    const uploadCommand = `aws s3 mv ${fileName} s3://${S3_BUCKET}/${orgId}/${objectName}/ --region ${AWS_REGION}`;
 
-  const objectFieldsOutput = execSync(`sf sobject describe --sobject ${objectName}  --target-org ${orgId} --json`, { encoding: 'utf-8' });
+    const fullCommand = `${exportCommand} && ${uploadCommand}`;
 
-  const objectFields = JSON.parse(objectFieldsOutput);
-  const fieldNames = objectFields.result.fields.map(field => field.name);
-  objectFieldCommaSeparated = fieldNames.join(',');
-
-  let query = `SELECT ${objectFieldCommaSeparated} FROM ${objectName}`;
-
-  let countQuery = `SELECT Count() FROM ${objectName}`;
-  const now = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
-  let clause = '';
-
-  if (backupType === 'Daily') {
-    clause += ` WHERE LastModifiedDate = TODAY`;
-  } else if (backupType === 'Differential') {
-    clause += ` WHERE LastModifiedDate >= LAST_N_DAYS:7`; // example: since last full backup
-  } else if (backupType === 'Incremental') {
-    clause += ` WHERE LastModifiedDate >= YESTERDAY`; // or use a custom timestamp if available
-  }
-  query += clause;
-  countQuery += clause; // Full backup doesn't need a WHERE clause
-  // Full backup doesn't need a WHERE clause
-
-try{
-  // Count the records first
-  const countCommand = `sf data query --query "${countQuery}" --json --target-org ${orgId}`;
-
-  const countOutput = execSync(countCommand, { encoding: 'utf-8' });
-  const result = JSON.parse(countOutput);
-
-  const totalRecords = result.result.totalSize;
-  console.log(`Record count: ${totalRecords}`);
-
-  if (totalRecords > 0) {
-    const exportCommand = `sf data export bulk --query "${query}" --output-file export-${objectName}-${now}.csv --wait 10000 --target-org ${orgId} && aws s3 mv export-${objectName}-${now}.csv s3://myapp-bucket-us-east-1-767900165297/${orgId}/${objectName}/`;
-    //const q = `echo '${exportCommand}' | bash`;
-    const q = exportCommand;
-    console.log('Executing:', q);
-
-    exec(q, async (err, stdout, stderr) => {
+    exec(fullCommand, async (err, stdout, stderr) => {
       if (err) {
-        console.error('Backup command failed:', stderr + `\nCommand: ${q}`);
-        await updateStatus("failed",err.message || String(err));
-        return res.status(500).json({ error: 'Backup command failed' });
+        console.error(`Backup failed for ${objectName}:`, stderr);
+        await updateStatus("failed", err.message || stderr);
+        return;
       }
-
-      console.log('Backup command output:', stdout);
-      await updateStatus("success");
-
-      res.json({ message: `Backup for ${objectName} started on org ${orgId}` });
+      console.log(`Backup completed for ${objectName}`, stdout);
+      await updateStatus("success", `Backup successful for ${objectName}`);
     });
 
-
-    //execSync(q, { encoding: 'utf-8' });
+  } catch (error) {
+    console.error(`Error in backup for ${objectName}:`, error);
+    await updateStatus("error", error.message || String(error));
   }
-}catch (error) {
-  console.error('Error during backup process:', error);
-  await updateStatus("Error",error.message || String(error));
-
-  return res.status(500).json({ error: 'An error occurred during the backup process' }) ;
 }
-  }catch (error) {
-    await updateStatus("Error",error.message || String(error));
-    console.error('Error in processBackup:', error);
-    return res.status(500).json({ error: 'An error occurred during the backup process' });
+
+// Express endpoint
+const processBackup = async (req, res) => {
+  console.log('Received backup request:', req.body);
+
+  const { orgId, objects, cloud, backupType } = req.body;
+
+  if (!orgId || !objects || objects.length === 0) {
+    return res.status(400).json({ error: 'Invalid request. orgId and objects are required.' });
   }
 
+  const objectName = objects[0];
 
+  try {
+    if (cloud) {
+      const cloudQuery = `sf sobject list --sobject custom -o ${orgId} --json`;
+      const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
+      const objectList = JSON.parse(cloudQueryOutput).result;
+
+      console.log(`[CLOUD MODE] ${objectList.length} objects found.`);
+
+      for (const obj of objectList) {
+        await performBackup({ orgId, objectName: obj, backupType });
+      }
+
+      return res.json({ message: `Backup started for ${objectList.length} cloud objects.` });
+    }
+
+    // Local backup mode
+    await performBackup({ orgId, objectName, backupType });
+
+    res.json({ message: `Backup initiated for ${objectName} on org ${orgId}` });
+  } catch (error) {
+    console.error('Unhandled error in processBackup:', error);
+    res.status(500).json({ error: 'An unexpected error occurred during the backup process' });
+  }
 };
+
 exports.processBackup = processBackup;
