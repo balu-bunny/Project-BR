@@ -80,15 +80,19 @@ async function performBackup({ orgId, objectName, backupType }) {
 
     const fullCommand = `${exportCommand} && ${uploadCommand}`;
 
-    exec(fullCommand, async (err, stdout, stderr) => {
-      if (err) {
-        console.error(`Backup failed for ${objectName}:`, stderr);
-        await updateStatus("failed", err.message || stderr);
-        return;
-      }
-      console.log(`Backup completed for ${objectName}`, stdout);
-      await updateStatus("success", `Backup successful for ${objectName}`);
-    });
+    // exec(fullCommand, async (err, stdout, stderr) => {
+    //   if (err) {
+    //     console.error(`Backup failed for ${objectName}:`, stderr);
+    //     await updateStatus("failed", err.message || stderr);
+    //     return;
+    //   }
+    //   console.log(`Backup completed for ${objectName}`, stdout);
+    //   await updateStatus("success", `Backup successful for ${objectName}`);
+    // });
+    const fullCommandOutput = execSync(fullCommand, { encoding: 'utf-8' });
+    console.log(`Backup command output for ${objectName}:`, fullCommandOutput);
+    console.log(`Backup completed for ${objectName}`);
+    await updateStatus("success", `Backup successful for ${objectName}. Output: ${fullCommandOutput}`);
 
   } catch (error) {
     console.error(`Error in backup for ${objectName}:`, error);
