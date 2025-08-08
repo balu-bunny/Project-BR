@@ -92,7 +92,7 @@ async function performBackup({ orgId, objectName, backupType }) {
     const fullCommandOutput = execSync(fullCommand, { encoding: 'utf-8' });
     console.log(`Backup command output for ${objectName}:`, fullCommandOutput);
     console.log(`Backup completed for ${objectName}`);
-    await updateStatus("success", `Backup successful for ${objectName}. Output: ${fullCommandOutput}`);
+    await updateStatus("success", `Backup successful for ${objectName});
 
   } catch (error) {
     console.error(`Error in backup for ${objectName}:`, error);
