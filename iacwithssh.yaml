@@ -134,7 +134,7 @@ Resources:
         Tags:
           - Key: Name
             Value: QPMSProcessTable
-  BackupJobsTable:
+  QPMSBackupJobsTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub 'BackupJobs-${AWS::StackName}'
@@ -427,7 +427,10 @@ Outputs:
   ProcessTableName:
     Description: The name of the created DynamoDB table
     Value: !Ref QPMSDynamoProcessTable
-    
+  ProcessTableName:
+    Description: The name of the created DynamoDB table
+    Value: !Ref QPMSBackupJobsTable
+
   SecurityGroupId:
     Description: The ID of the security group created for the EC2 instance
     Value: !Ref QPMSSecurityGroup

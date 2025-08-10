@@ -2,7 +2,7 @@
 const { execSync } = require('../util/processWrapper');
 const { randomUUID } = require('crypto');
 const workItemModel = require('../models/workItemModel');
-const cron = require('node-cron');
+//const cron = require('node-cron');
 
 // Use env vars to be EC2-safe and portable
 const S3_BUCKET = process.env.S3_BUCKET || 'myapp-bucket-us-east-1-767900165297';
