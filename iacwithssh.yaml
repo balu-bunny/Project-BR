@@ -134,6 +134,32 @@ Resources:
         Tags:
           - Key: Name
             Value: QPMSProcessTable
+  BackupJobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'BackupJobs-${AWS::StackName}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: jobId
+          AttributeType: S
+        - AttributeName: orgId
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+      KeySchema:
+        - AttributeName: jobId
+          KeyType: HASH
+        - AttributeName: orgId
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: OrgStatusIndex
+          KeySchema:
+            - AttributeName: orgId
+              KeyType: HASH
+            - AttributeName: status
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
   QPMSUserPool:
     Type: AWS::Cognito::UserPool
     Metadata:
