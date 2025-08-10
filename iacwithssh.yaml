@@ -160,6 +160,10 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+      Tags:
+        - Key: Name
+          Value: QPMSBackupJobsTable
+
   QPMSUserPool:
     Type: AWS::Cognito::UserPool
     Metadata:
@@ -427,7 +431,8 @@ Outputs:
   ProcessTableName:
     Description: The name of the created DynamoDB table
     Value: !Ref QPMSDynamoProcessTable
-  ProcessTableName:
+
+  ScheduledJobTableName:
     Description: The name of the created DynamoDB table
     Value: !Ref QPMSBackupJobsTable
 
