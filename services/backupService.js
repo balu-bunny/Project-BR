@@ -151,8 +151,8 @@ const processBackup = async (req, res) => {
 
   try {
     if (cloud) {
-      //const cloudQuery = `sf sobject list --sobject custom -o ${orgId} --json`;
-      const cloudQuery = `sf sobject list -o ${orgId} --json`;
+      const cloudQuery = `sf sobject list --sobject custom -o ${orgId} --json`;
+      //const cloudQuery = `sf sobject list -o ${orgId} --json`;
 
       const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
       const objectList = JSON.parse(cloudQueryOutput).result;
@@ -163,6 +163,33 @@ const processBackup = async (req, res) => {
         await performBackup({ orgId, objectName: obj, backupType });
       }
 
+      let standardPlatformObjects = [
+        'Account',
+        'Contact',
+        'Task',
+        'Event',
+        'Note',
+        'Attachment',
+        'Document',
+        'Report',
+        'Dashboard',
+        'ProcessDefinition',
+        'ProcessNode',
+        'ProcessInstance',
+        'ProcessInstanceStep',
+        'ProcessInstanceHistory',
+        'ProcessInstanceWorkitem',
+        'ContentVersion',
+        'ContentDocument',
+        'ContentDocumentLink',
+        'ContentWorkspace',
+        'ContentWorkspaceDoc'
+      ]
+
+      for (const obj of standardPlatformObjects) {
+        await performBackup({ orgId, objectName: obj, backupType });
+      }
+      
       return res.json({
         message: `Backup started for ${objectList.length} cloud objects.`,
       });

@@ -7,5 +7,6 @@ router.get('/orgs', orgController.getOrgs);
 router.post('/backup', backupController.backupData);
 router.post('/addNewOrg', orgController.addNewOrg);
 router.post('/envvariable', orgController.addNewOrg);
+router.post('/schedule', orgController.addNewOrg);
 
 module.exports = router;

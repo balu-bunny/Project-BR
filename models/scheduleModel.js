@@ -7,6 +7,9 @@ const dynamoDb = new AWS.DynamoDB.DocumentClient({
 
 const TABLE_NAME = 'BackupJobs-BackUpAndRestore';
 
+
+
+
 async function createSchedule({ orgId, objects, backupType, schedule }) {
   const jobId = randomUUID();
   const params = {
@@ -54,8 +57,17 @@ async function updateScheduleStatus(jobId, lastResult) {
   await dynamoDb.update(params).promise();
 }
 
+async function insertWorkItem(params) {
+  try {
+    return await createSchedule(params);
+  } catch (err) {
+    throw err;
+  }
+}
+
 module.exports = {
   createSchedule,
   getActiveSchedules,
   updateScheduleStatus,
+  insertWorkItem,
 };

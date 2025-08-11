@@ -6,6 +6,7 @@
     CreatedAt: { S: 'new Date().toISOString()' }
   }'
 
+aws dynamodb put-item --table-name BackupJobs-BackUpAndRestore  --item '{ "jobId": { "S": "asdfasdfasdfasdfads" }, "orgId": { "S": "source" }, "objects": { "L": [ { "S": "Account" } ] }, "backupType": { "S": "full" }, "schedule": { "S": "cron(0 2 * * ? *)" }, "status": { "S": "active" }, "lastRun": { "NULL": true }, "lastResult": { "NULL": true } }'
 
 aws dynamodb put-item --table-name ProcessLogTable-BackUpAndRestore --item "{\"PK\": {\"S\": \"PROCESS#001\"}, \"PID\": {\"N\": \"1231231231\"}, \"Command\": {\"S\": \"my-command\"}, \"Type\": {\"S\": \"batch\"}, \"CreatedAt\": {\"S\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}}"
 aws dynamodb put-item \
