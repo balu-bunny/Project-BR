@@ -50,6 +50,13 @@ Parameters:
     Type: String
     Default: QPMSIdentityPool
     Description: Name of the Cognito Identity Pool
+  EnableTTL:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Enable TTL for DynamoDB table
 
 Conditions:
   UseEncryption: !Not [!Equals [!Ref BucketEncryptionType, none]]
@@ -58,6 +65,7 @@ Conditions:
   DeleteS3: !Equals [!Ref S3DeletionPolicy, Delete]
   DeleteDynamo: !Equals [!Ref DynamoDeletionPolicy, Delete]
   DeleteCognito: !Equals [!Ref CognitoDeletionPolicy, Delete]
+  TTL_Enabled: !Equals [!Ref EnableTTL, "true"]
 Resources:
   QPMSDynamoJOBStatusTable:
     Type: AWS::DynamoDB::Table
@@ -93,6 +101,11 @@ Resources:
                 KeyType: HASH
             Projection:
               ProjectionType: ALL
+      TimeToLiveSpecification: !If 
+        - TTL_Enabled
+        - AttributeName: ExpiresAt
+          Enabled: true
+        - !Ref AWS::NoValue
       Tags:
         - Key: Name
           Value: QPMSAppTable

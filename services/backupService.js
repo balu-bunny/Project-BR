@@ -44,6 +44,7 @@ async function performBackup({ orgId, objectName, backupType }) {
       orgId,
       timestamp, // store for future incremental/differential
       backupType,
+      ExpiresAt: timestamp,
       description: `Backup for ${objectName} on org ${orgId}`,
     },
   };
@@ -75,8 +76,21 @@ async function performBackup({ orgId, objectName, backupType }) {
       { encoding: 'utf-8' }
     );
     const objectFields = JSON.parse(objectFieldsOutput);
-    const fieldNames = objectFields.result.fields.map((field) => field.name);
-    const objectFieldCommaSeparated = fieldNames.join(',');
+
+
+    const compoundParents = new Set(
+      objectFields.result.fields
+        .filter(f => f.compoundFieldName) // subfields
+        .map(f => f.compoundFieldName)    // parent compound names
+    );
+
+    // 2️⃣ Filter out any field whose name is in compoundParents
+    const filteredFields = objectFields.result.fields
+      .filter(f => !compoundParents.has(f.name))
+      .map(f => f.name);
+
+    console.log(filteredFields);
+    const objectFieldCommaSeparated = filteredFields.join(',');
 
     // Build query
     let query = `SELECT ${objectFieldCommaSeparated} FROM ${objectName}`;
