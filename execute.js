@@ -1,39 +1,17 @@
 const { execSync } = require('child_process');
 
-// Simulate request body (as you'd get in an API call)
-const req = {
-  body: {
-    orgId: 'source', // Replace with your orgId
-    objects: [],
-    cloud: 'some-cloud'
-  }
-};
-
-const res = {
-  send: console.log,
-  status: (code) => ({ send: (msg) => console.error(`Error ${code}:`, msg) })
-};
-
-function processBackup(req, res) {
-  const { orgId, objects, cloud, backupType } = req.body;
-
-  if (cloud !== undefined && cloud !== '') {
-    try {
-      const cloudQuery = `sf sobject list --sobject custom -o  ${orgId} --json`;
-      const cloudQueryOutput = execSync(cloudQuery, { encoding: 'utf-8' });
-        console.log(cloudQueryOutput);
-      const objectsResult = JSON.parse(cloudQueryOutput);
-      const totalobjects = objectsResult.result;
-        console.log(totalobjects);
-        console.log(totalobjects.length);
-    } catch (error) {
-      console.error('Error executing or parsing command:', error.message);
-      res.status(500).send('Failed to retrieve objects');
-    }
-  } else {
-    res.status(400).send('Cloud parameter is missing');
-  }
+let awsRegion = '';
+try {
+  awsRegion = execSync(`
+    TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+      -H "X-aws-ec2-metadata-token-ttl-seconds: 21600") && \
+    AZ=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+      http://169.254.169.254/latest/meta-data/placement/availability-zone) && \
+    REGION=\${AZ::-1} && \
+    echo $REGION
+  `, { encoding: 'utf-8', shell: '/bin/bash' }).trim();
+} catch (err) {
+  console.error('Failed to get AWS region:', err.message);
 }
 
-// Call the function
-processBackup(req, res);
+console.log('AWS Region:', awsRegion);

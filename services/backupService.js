@@ -19,10 +19,14 @@ try {
 let awsRegion = '';
 try {
   if (!awsRegion) {
-    awsRegion = execSync(
-      'aws configure get region',
-      { encoding: 'utf-8' }
-    ).trim();
+      awsRegion = execSync(`
+        TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+          -H "X-aws-ec2-metadata-token-ttl-seconds: 21600") && \
+        AZ=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+          http://169.254.169.254/latest/meta-data/placement/availability-zone) && \
+        REGION=\${AZ::-1} && \
+        echo $REGION
+      `, { encoding: 'utf-8', shell: '/bin/bash' }).trim();
   }
 } catch (err) {
   console.error('Failed to get AWS region:', err.message);
@@ -166,6 +170,7 @@ async function performBackup({ orgId, objectName, backupType }) {
     const fileName = `export-${objectName}-${fileSafeTime}.csv`;
     const exportCommand = `sf data export bulk --query "${query}" --output-file ${fileName} --wait 10000 --target-org ${orgId}`;
     const uploadCommand = `aws s3 mv ${fileName} s3://${S3_BUCKET}/${orgId}/${objectName}/ --region ${awsRegion}`;
+    console.log(uploadCommand);
     const fullCommand = `${exportCommand} && ${uploadCommand}`;
 
     const fullCommandOutput = execSync(fullCommand, { encoding: 'utf-8' });
