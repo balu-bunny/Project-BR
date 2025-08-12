@@ -10,7 +10,7 @@ const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const STATUS_TABLE = 'JobStatusTable-BackUpAndRestore';
 
 const isPlatformEvent = (objectName) =>
-  objectName.endsWith('__x') || objectName.endsWith('__b') || objectName.endsWith('__e');
+  objectName.endsWith('__x') || objectName.endsWith('__e');
 
 /**
  * Get last backup timestamp from DynamoDB for a given org + object
@@ -97,21 +97,27 @@ async function performBackup({ orgId, objectName, backupType }) {
     let countQuery = `SELECT Count() FROM ${objectName}`;
     let clause = '';
 
+    let LastModifiedDate = 'LastModifiedDate';
+
+    if(objectName.endsWith('__b')){
+      LastModifiedDate = 'QPMS__CreatedDate__c'; // Use CreatedDate for initial backups
+    }
+
     if (backupType === 'Daily') {
-      clause += ` WHERE LastModifiedDate = TODAY`;
+      clause += ` WHERE ${LastModifiedDate} = TODAY`;
     } else if (backupType === 'Differential') {
       const lastBackup = await getLastBackupTimestamp(orgId, objectName);
       if (lastBackup) {
-        clause += ` WHERE LastModifiedDate >= ${lastBackup}`;
+        clause += ` WHERE ${LastModifiedDate} >= ${lastBackup}`;
       } else {
-        clause += ` WHERE LastModifiedDate >= LAST_N_DAYS:7`; // default if no history
+        clause += ` WHERE ${LastModifiedDate} >= LAST_N_DAYS:7`; // default if no history
       }
     } else if (backupType === 'Incremental') {
       const lastBackup = await getLastBackupTimestamp(orgId, objectName);
       if (lastBackup) {
-        clause += ` WHERE LastModifiedDate > ${lastBackup}`;
+        clause += ` WHERE ${LastModifiedDate} > ${lastBackup}`;
       } else {
-        clause += ` WHERE LastModifiedDate >= YESTERDAY`; // default if no history
+        clause += ` WHERE ${LastModifiedDate} >= YESTERDAY`; // default if no history
       }
     }
 
@@ -119,16 +125,18 @@ async function performBackup({ orgId, objectName, backupType }) {
     countQuery += clause;
 
     // Count first
-    const countOutput = execSync(
-      `sf data query --query "${countQuery}" --json --target-org ${orgId}`,
-      { encoding: 'utf-8' }
-    );
-    const totalRecords = JSON.parse(countOutput).result.totalSize;
+    if(!objectName.endsWith('__b')){
+      const countOutput = execSync(
+        `sf data query --query "${countQuery}" --json --target-org ${orgId}`,
+        { encoding: 'utf-8' }
+      );
+      const totalRecords = JSON.parse(countOutput).result.totalSize;
 
-    console.log(`[${objectName}] Record count: ${totalRecords}`);
-    if (totalRecords === 0) {
-      await updateStatus('skipped', `No records found for ${objectName}`);
-      return;
+      console.log(`[${objectName}] Record count: ${totalRecords}`);
+      if (totalRecords === 0) {
+        await updateStatus('skipped', `No records found for ${objectName}`);
+        return;
+      }
     }
 
     // Export & Upload

@@ -23,6 +23,7 @@ node connection.js POST addNewOrg source
 
 node -e "fetch('http://localhost:3000/api/addNewOrg', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: ['Account'], orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
 
+node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['Account'], orgId:'source',backupType:'Differential' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
 
 node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['Account'], orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
 

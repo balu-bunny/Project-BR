@@ -1,0 +1,6 @@
+ACCESS_TOKEN=$(sf org display --target-org myAlias --json | jq -r '.result.accessToken')
+INSTANCE_URL=$(sf org display --target-org myAlias --json | jq -r '.result.instanceUrl')
+
+curl -L "$INSTANCE_URL/services/data/v60.0/sobjects/ContentVersion/$CONTENT_VERSION_ID/VersionData" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  --output MyFile.pdf
