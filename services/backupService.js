@@ -5,8 +5,31 @@ const workItemModel = require('../models/workItemModel');
 //const cron = require('node-cron');
 
 // Use env vars to be EC2-safe and portable
-const S3_BUCKET = process.env.S3_BUCKET || 'myapp-bucket-us-east-1-767900165297';
-const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+
+let accountId = '';
+try {
+  accountId = execSync(
+    'aws sts get-caller-identity --query "Account" --output text',
+    { encoding: 'utf-8' }
+  ).trim();
+} catch (err) {
+  console.error('Failed to get AWS account ID:', err.message);
+}
+
+let awsRegion = process.env.AWS_REGION || '';
+try {
+  if (!awsRegion) {
+    awsRegion = execSync(
+      'aws configure get region',
+      { encoding: 'utf-8' }
+    ).trim();
+  }
+} catch (err) {
+  console.error('Failed to get AWS region:', err.message);
+}
+
+// Build S3 bucket name dynamically
+const S3_BUCKET = process.env.S3_BUCKET || `myapp-bucket-${awsRegion}-${accountId}`;
 const STATUS_TABLE = 'JobStatusTable-BackUpAndRestore';
 
 const isPlatformEvent = (objectName) =>

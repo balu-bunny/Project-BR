@@ -1,0 +1,11 @@
+key pair
+
+cd Project-BR
+node -e "fetch('http://localhost:3000/api/orgs').then(res => res.json()).then(console.log)"
+node connection.js POST addNewOrg source
+
+
+node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['Account'], cloud:'platform', orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
+
+
+unix
