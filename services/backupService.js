@@ -165,7 +165,7 @@ async function performBackup({ orgId, objectName, backupType }) {
     // Export & Upload
     const fileName = `export-${objectName}-${fileSafeTime}.csv`;
     const exportCommand = `sf data export bulk --query "${query}" --output-file ${fileName} --wait 10000 --target-org ${orgId}`;
-    const uploadCommand = `aws s3 mv ${fileName} s3://${S3_BUCKET}/${orgId}/${objectName}/ --region ${AWS_REGION}`;
+    const uploadCommand = `aws s3 mv ${fileName} s3://${S3_BUCKET}/${orgId}/${objectName}/ --region ${awsRegion}`;
     const fullCommand = `${exportCommand} && ${uploadCommand}`;
 
     const fullCommandOutput = execSync(fullCommand, { encoding: 'utf-8' });
