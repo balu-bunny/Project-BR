@@ -16,7 +16,7 @@ try {
   console.error('Failed to get AWS account ID:', err.message);
 }
 
-let awsRegion = process.env.AWS_REGION || '';
+let awsRegion = '';
 try {
   if (!awsRegion) {
     awsRegion = execSync(
