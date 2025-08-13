@@ -3,6 +3,7 @@ const { execSync } = require('../util/processWrapper');
 const { randomUUID } = require('crypto');
 const workItemModel = require('../models/workItemModel');
 //const cron = require('node-cron');
+const path = require('path');
 
 // Use env vars to be EC2-safe and portable
 
@@ -52,6 +53,47 @@ async function getLastBackupTimestamp(orgId, objectName) {
     console.warn(`No last backup timestamp found for ${objectName} in ${orgId}`);
   }
   return null;
+}
+
+let ACCESS_TOKEN = '';
+let INSTANCE_URL = '';
+
+function initSalesforceAuth() {
+  ACCESS_TOKEN = execSync(
+    `sf org display --target-org myAlias --json | jq -r '.result.accessToken'`,
+    { encoding: 'utf-8' }
+  ).trim();
+
+  INSTANCE_URL = execSync(
+    `sf org display --target-org myAlias --json | jq -r '.result.instanceUrl'`,
+    { encoding: 'utf-8' }
+  ).trim();
+}
+
+function downloadFileAndMoveToS3(contentVersionId, title) {
+  const safeTitle = title.replace(/[^\w.-]/g, '_');
+  const localPath = path.join('/home/ubuntu', safeTitle);
+  const s3Key = `${orgId}/ContentVersion/${safeTitle}`;
+
+  // Download file from Salesforce
+  const curlCmd = `curl -s -L "${INSTANCE_URL}/services/data/v60.0/sobjects/ContentVersion/${contentVersionId}/VersionData" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+    --output "${localPath}"`;
+
+  // Move file to S3
+  const s3Cmd = `aws s3 mv "${localPath}" "s3://${S3_BUCKET}/${s3Key}" --region ${awsRegion}`;
+
+  try {
+    console.log(`Downloading ${safeTitle}...`);
+    execSync(curlCmd, { stdio: 'inherit' });
+
+    console.log(`Moving ${safeTitle} to S3...`);
+    execSync(s3Cmd, { stdio: 'inherit' });
+
+    console.log(`✅ ${safeTitle} uploaded to s3://${S3_BUCKET}/${s3Key}`);
+  } catch (err) {
+    console.error(`Failed for ${safeTitle}:`, err.message);
+  }
 }
 
 /**
@@ -166,6 +208,7 @@ async function performBackup({ orgId, objectName, backupType }) {
       }
     }
 
+
     // Export & Upload
     const fileName = `export-${objectName}-${fileSafeTime}.csv`;
     const exportCommand = `sf data export bulk --query "${query}" --output-file ${fileName} --wait 10000 --target-org ${orgId}`;
@@ -177,6 +220,29 @@ async function performBackup({ orgId, objectName, backupType }) {
     console.log(`Backup command output for ${objectName}:`, fullCommandOutput);
 
     await updateStatus('success', `Backup successful for ${objectName}`);
+
+    if(objectName =='ContentVersion'){
+      const localCsvPath = path.join('/home/ubuntu', 'content_version.csv');
+
+  // Download the file from S3
+      const downloadCommand = `aws s3 cp s3://${S3_BUCKET}/${orgId}/${objectName}/content_version.csv ${localCsvPath} --region ${awsRegion}`;
+      execSync(downloadCommand, { stdio: 'inherit' });
+
+      console.log('Processing CSV file...');
+      fs.createReadStream(localCsvPath)
+        .pipe(csv())
+        .on('data', (row) => {
+          // Process each row here
+          console.log('Row:', row);
+          downloadFileAndMoveToS3(row.Id, row.Title);
+
+        })
+        .on('end', () => {
+          console.log('CSV processing complete.');
+        });
+      // Perform additional actions for ContentVersion  
+    }
+
   } catch (error) {
     console.error(`Error in backup for ${objectName}:`, error);
     await updateStatus('error', error.message || String(error));
