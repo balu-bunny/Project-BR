@@ -19,6 +19,7 @@
     "@aws-sdk/lib-dynamodb": "^3.850.0",
     "aws-sdk": "^2.1692.0",
     "axios": "^1.10.0",
+    "csv-parser": "^3.2.0",
     "express": "^5.1.0"
   },
   "repository": {

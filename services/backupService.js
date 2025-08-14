@@ -232,8 +232,8 @@ async function performBackup({ orgId, objectName, backupType }) {
     await updateStatus('success', `Backup successful for ${objectName}`);
 
     if(objectName =='ContentVersion'){
-      const localCsvPath = path.join('/home/ubuntu', 'content_version.csv');
-
+      const localCsvPath = path.join('/home/ubuntu', fileName);
+      initSalesforceAuth();
   // Download the file from S3
       const downloadCommand = `aws s3 cp s3://${S3_BUCKET}/${orgId}/${objectName}/${fileName} ${localCsvPath} --region ${awsRegion}`;
       execSync(downloadCommand, { stdio: 'inherit' });
