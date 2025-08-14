@@ -6,20 +6,46 @@ const workItemModel = require('../models/workItemModel');
 const path = require('path');
 const fs = require('fs');
 const csv = require('csv-parser');
+require('dotenv').config(); // must be at the top
 
-// Use env vars to be EC2-safe and portable
+function updateEnvVariable(key, value) {
+  const envFilePath = '.env';
 
-let accountId = '';
-try {
-  accountId = execSync(
-    'aws sts get-caller-identity --query "Account" --output text',
-    { encoding: 'utf-8' }
-  ).trim();
-} catch (err) {
-  console.error('Failed to get AWS account ID:', err.message);
+  // Read existing .env content
+  let envContent = '';
+  if (fs.existsSync(envFilePath)) {
+    envContent = fs.readFileSync(envFilePath, 'utf-8');
+  }
+
+  // Remove any existing key=value line for this key
+  const envLines = envContent
+    .split('\n')
+    .filter(line => !line.startsWith(`${key}=`) && line.trim() !== '');
+
+  // Add updated key=value
+  envLines.push(`${key}=${value}`);
+
+  // Write back to file
+  fs.writeFileSync(envFilePath, envLines.join('\n') + '\n', { flag: 'w' });
 }
+let accountId = process.env.AWS_ACCOUNT_ID || '';
+console.log('=================================',accountId);
+debugger;
+try {
+    if (!accountId) {
+      accountId = execSync(
+          'aws sts get-caller-identity --query "Account" --output text',
+          { encoding: 'utf-8' }
+        ).trim();
+        updateEnvVariable('AWS_ACCOUNT_ID', accountId);
 
-let awsRegion = '';
+      }
+    } catch (err) {
+      console.error('Failed to get AWS account ID:', err.message);
+    }
+
+
+let awsRegion = process.env.AWS_REGION || '';
 try {
   if (!awsRegion) {
       awsRegion = execSync(`
@@ -30,6 +56,9 @@ try {
         REGION=\${AZ::-1} && \
         echo $REGION
       `, { encoding: 'utf-8', shell: '/bin/bash' }).trim();
+          updateEnvVariable('AWS_REGION', accountId);
+
+    fs.writeFileSync('.env', `AWS_REGION=${awsRegion}\n`, { flag: 'w' });
   }
 } catch (err) {
   console.error('Failed to get AWS region:', err.message);
@@ -62,17 +91,17 @@ let INSTANCE_URL = '';
 
 function initSalesforceAuth(myAlias) {
   ACCESS_TOKEN = execSync(
-    `sf org display --target-org ${myAlias} --json | jq -r '.result.accessToken'`,
+    `sf org display --target-org ${myAlias} --json | jq -r ".result.accessToken"`,
     { encoding: 'utf-8' }
   ).trim();
 
   INSTANCE_URL = execSync(
-    `sf org display --target-org ${myAlias} --json | jq -r '.result.instanceUrl'`,
+    `sf org display --target-org ${myAlias} --json | jq -r ".result.instanceUrl"`,
     { encoding: 'utf-8' }
   ).trim();
 }
 
-function downloadFileAndMoveToS3(contentVersionId, title, filePath) {
+function downloadFileAndMoveToS3(contentVersionId, title, filePath, orgId) {
   const safeTitle = title.replace(/[^\w.-]/g, '_');
   const localPath = path.join('/home/ubuntu', safeTitle);
   const s3Key = `${orgId}/ContentVersion/${filePath}/${safeTitle}`;
@@ -248,7 +277,7 @@ async function performBackup({ orgId, objectName, backupType }) {
         .on('data', (row) => {
           // Process each row here
           console.log('Row:', row);
-          downloadFileAndMoveToS3(row.Id, row.Title, `export-${objectName}-${fileSafeTime}`);
+          downloadFileAndMoveToS3(row.Id, row.Title, `export-${objectName}-${fileSafeTime}`, orgId);
 
         })
         .on('end', () => {

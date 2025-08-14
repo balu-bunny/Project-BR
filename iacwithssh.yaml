@@ -367,6 +367,7 @@ Resources:
           cd Project-BR
           npm init -y
           npm install express
+          npm install dotenv
           npm install csv-parser
           npm install -g pm2
           pm2 start app.js

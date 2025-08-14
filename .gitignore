@@ -2,3 +2,4 @@
 /QPMS-AWS.pem
 /ac.json
 /dynamoDbSchema.yaml
+/.env
