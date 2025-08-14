@@ -60,22 +60,22 @@ async function getLastBackupTimestamp(orgId, objectName) {
 let ACCESS_TOKEN = '';
 let INSTANCE_URL = '';
 
-function initSalesforceAuth() {
+function initSalesforceAuth(myAlias) {
   ACCESS_TOKEN = execSync(
-    `sf org display --target-org myAlias --json | jq -r '.result.accessToken'`,
+    `sf org display --target-org ${myAlias} --json | jq -r '.result.accessToken'`,
     { encoding: 'utf-8' }
   ).trim();
 
   INSTANCE_URL = execSync(
-    `sf org display --target-org myAlias --json | jq -r '.result.instanceUrl'`,
+    `sf org display --target-org ${myAlias} --json | jq -r '.result.instanceUrl'`,
     { encoding: 'utf-8' }
   ).trim();
 }
 
-function downloadFileAndMoveToS3(contentVersionId, title) {
+function downloadFileAndMoveToS3(contentVersionId, title, filePath) {
   const safeTitle = title.replace(/[^\w.-]/g, '_');
   const localPath = path.join('/home/ubuntu', safeTitle);
-  const s3Key = `${orgId}/ContentVersion/${safeTitle}`;
+  const s3Key = `${orgId}/ContentVersion/${filePath}/${safeTitle}`;
 
   // Download file from Salesforce
   const curlCmd = `curl -s -L "${INSTANCE_URL}/services/data/v60.0/sobjects/ContentVersion/${contentVersionId}/VersionData" \
@@ -120,8 +120,9 @@ async function performBackup({ orgId, objectName, backupType }) {
     },
   };
 
-  const updateStatus = async (status, customDescription) => {
+  const updateStatus = async (status, customDescription, id) => {
     baseParams.Item.status = status;
+    baseParams.Item.id = id || baseParams.Item.id;
     baseParams.Item.description = customDescription || baseParams.Item.description;
     return workItemModel.insertWorkItem({
       ...baseParams,
@@ -233,7 +234,10 @@ async function performBackup({ orgId, objectName, backupType }) {
 
     if(objectName =='ContentVersion'){
       const localCsvPath = path.join('/home/ubuntu', fileName);
-      initSalesforceAuth();
+      let tid = randomUUID();
+      await updateStatus('in_progress', `Backup in progress for ${objectName}`, tid);
+      initSalesforceAuth(orgId);
+      await updateStatus('in_progress', `Backup in progress for ${objectName}`, tid);
   // Download the file from S3
       const downloadCommand = `aws s3 cp s3://${S3_BUCKET}/${orgId}/${objectName}/${fileName} ${localCsvPath} --region ${awsRegion}`;
       execSync(downloadCommand, { stdio: 'inherit' });
@@ -244,15 +248,15 @@ async function performBackup({ orgId, objectName, backupType }) {
         .on('data', (row) => {
           // Process each row here
           console.log('Row:', row);
-          downloadFileAndMoveToS3(row.Id, row.Title);
+          downloadFileAndMoveToS3(row.Id, row.Title, `export-${objectName}-${fileSafeTime}`);
 
         })
         .on('end', () => {
           console.log('CSV processing complete.');
         });
       // Perform additional actions for ContentVersion  
-
       execSync(`rm -f ${localCsvPath}/${fileName}`, { stdio: 'inherit' });
+      await updateStatus('success', `Backup in progress for ${objectName}`, tid);
 
     }
 
