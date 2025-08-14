@@ -4,6 +4,7 @@ const { randomUUID } = require('crypto');
 const workItemModel = require('../models/workItemModel');
 //const cron = require('node-cron');
 const path = require('path');
+const fs = require('fs');
 
 // Use env vars to be EC2-safe and portable
 
