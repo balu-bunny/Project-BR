@@ -158,6 +158,14 @@ async function performBackup({ orgId, objectName, backupType }) {
       .filter(f => !compoundParents.has(f.name))
       .map(f => f.name);
 
+
+    if(objectName === 'ContentVersion') {
+      const index = filteredFields.indexOf('VersionData');
+      if (index > -1) {
+        filteredFields.splice(index, 1);
+      }
+    }
+
     console.log(filteredFields);
     const objectFieldCommaSeparated = filteredFields.join(',');
 
