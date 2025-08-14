@@ -235,7 +235,7 @@ async function performBackup({ orgId, objectName, backupType }) {
     if(objectName =='ContentVersion'){
       const localCsvPath = path.join('/home/ubuntu', fileName);
       let tid = randomUUID();
-      await updateStatus('in_progress', `Backup in progress for ${objectName}`, tid);
+      await updateStatus('started', `Backup in progress for ${objectName}`, tid);
       initSalesforceAuth(orgId);
       await updateStatus('in_progress', `Backup in progress for ${objectName}`, tid);
   // Download the file from S3
