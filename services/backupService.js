@@ -233,7 +233,7 @@ async function performBackup({ orgId, objectName, backupType }) {
       const localCsvPath = path.join('/home/ubuntu', 'content_version.csv');
 
   // Download the file from S3
-      const downloadCommand = `aws s3 cp s3://${S3_BUCKET}/${orgId}/${objectName}/content_version.csv ${localCsvPath} --region ${awsRegion}`;
+      const downloadCommand = `aws s3 cp s3://${S3_BUCKET}/${orgId}/${objectName}/${fileName} ${localCsvPath} --region ${awsRegion}`;
       execSync(downloadCommand, { stdio: 'inherit' });
 
       console.log('Processing CSV file...');
@@ -249,6 +249,9 @@ async function performBackup({ orgId, objectName, backupType }) {
           console.log('CSV processing complete.');
         });
       // Perform additional actions for ContentVersion  
+
+      execSync(`rm -f ${localCsvPath}/${fileName}`, { stdio: 'inherit' });
+
     }
 
   } catch (error) {
