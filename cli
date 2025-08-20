@@ -27,6 +27,11 @@ node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 
 
 node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['ContentVersion'], orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
 
+
+node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['QPMS__Document_Profile_History__c'], orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
+
+
+
 node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['Account'], cloud:'platform', orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
 
 0 2 * * * node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['Account'], orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))" 
