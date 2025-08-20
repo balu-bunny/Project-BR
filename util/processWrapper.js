@@ -10,7 +10,7 @@ async function logToDynamo({ pid, command, type, status }) {
   const id = uuidv4();
   const item = {
     PK: { S: `PROCESS#${id}` },
-    PID: { N: pid.toString() },
+    PID: { S: pid.toString() },
     Command: { S: command },
     Type: { S: type },
     status: { S: status },
@@ -28,8 +28,7 @@ async function logToDynamo({ pid, command, type, status }) {
 // Wrapped exec
 function exec(command, options, callback) {
   const uuidStr = uuidv4();
-  const uuidNum = BigInt('0x' + uuidStr.replace(/-/g, ''));
-  logToDynamo({ pid: uuidNum, command, type: 'exec', status: 'started' });
+  logToDynamo({ pid: uuidStr, command, type: 'exec', status: 'started' });
   const child = rawExec(command, options, callback);
   logToDynamo({ pid: child.pid, command, type: 'exec', status: 'completed' });
   return child;
@@ -38,10 +37,9 @@ function exec(command, options, callback) {
 // Wrapped spawn
 function spawn(command, args, options) {
   const uuidStr = uuidv4();
-  const uuidNum = BigInt('0x' + uuidStr.replace(/-/g, ''));
   const fullCommand = `${command} ${args.join(' ')}`;
 
-  logToDynamo({ pid: uuidNum, command: fullCommand, type: 'spawn', status: 'started' });
+  logToDynamo({ pid: uuidStr, command: fullCommand, type: 'spawn', status: 'started' });
   const child = rawSpawn(command, args, { shell: true, ...options });
   logToDynamo({ pid: child.pid, command: fullCommand, type: 'spawn', status: 'completed' });
   return child;
@@ -49,8 +47,7 @@ function spawn(command, args, options) {
 
 function execSync(command, options) {
   const uuidStr = uuidv4();
-  const uuidNum = BigInt('0x' + uuidStr.replace(/-/g, ''));
-  logToDynamo({ pid: uuidNum, command, type: 'execSync', status: 'started' });
+  logToDynamo({ pid: uuidStr, command, type: 'execSync', status: 'started' });
 
   const result = rawExecSync(command, { shell: true, ...options });
   logToDynamo({ pid: process.pid, command, type: 'execSync', status: 'completed' });

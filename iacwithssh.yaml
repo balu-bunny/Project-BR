@@ -121,7 +121,7 @@ Resources:
           - AttributeName: PK
             AttributeType: S
           - AttributeName: PID
-            AttributeType: N
+            AttributeType: S
           - AttributeName: Type
             AttributeType: S
           - AttributeName: CreatedAt
