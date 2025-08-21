@@ -355,7 +355,7 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           apt update -y
-          curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+          curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
           apt install -y nodejs git unzip nginx
           npm install -g @salesforce/cli
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"

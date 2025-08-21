@@ -1,0 +1,30 @@
+ubuntu@ip-172-31-23-181:~/Project-BR$ df -h
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root       6.8G  3.4G  3.4G  50% /
+tmpfs           479M     0  479M   0% /dev/shm
+tmpfs           192M  884K  191M   1% /run
+tmpfs           5.0M     0  5.0M   0% /run/lock
+/dev/xvda16     881M   86M  734M  11% /boot
+/dev/xvda15     105M  6.2M   99M   6% /boot/efi
+tmpfs            96M   12K   96M   1% /run/user/1000
+ubuntu@ip-172-31-23-181:~/Project-BR$ sudo fallocate -l 2G /swapfile
+ubuntu@ip-172-31-23-181:~/Project-BR$ sudo chmod 600 /swapfile
+ubuntu@ip-172-31-23-181:~/Project-BR$ sudo mkswap /swapfile
+Setting up swapspace version 1, size = 2 GiB (2147479552 bytes)
+no label, UUID=9c4e9f9b-bc92-40d2-af51-1be4fa3670c8
+ubuntu@ip-172-31-23-181:~/Project-BR$ sudo swapon /swapfile
+ubuntu@ip-172-31-23-181:~/Project-BR$ swapon --show
+NAME      TYPE SIZE USED PRIO
+/swapfile file   2G   0B   -2
+ubuntu@ip-172-31-23-181:~/Project-BR$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           957Mi       409Mi       205Mi       900Ki       535Mi       547Mi
+Swap:          2.0Gi          0B       2.0Gi
+ubuntu@ip-172-31-23-181:~/Project-BR$ sudo nano /etc/fstab
+
+/swapfile none swap sw 0 0
+
+
+ubuntu@ip-172-31-23-181:~/Project-BR$ echo "vm.swappiness=10" | sudo tee -a /etc/sysctl.conf
+vm.swappiness=10
+
