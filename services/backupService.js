@@ -12,6 +12,8 @@ const { fetch } = require('undici');
 require('dotenv').config(); // must be at the top
 
 async function createBulkJob(objectName, query) {
+    const id = randomUUID();
+
   const jobRequest = {
     operation: 'query', 
     contentType: 'CSV',
@@ -30,7 +32,9 @@ async function createBulkJob(objectName, query) {
   console.log(`Created bulk job:`,response);
 
   if (!response.ok) {
-    throw new Error(`Failed to create bulk job: ${response.statusText}`);
+        await updateStatus('error', `${objectName} ${query} response: ${String(response)}`, id);
+
+    //throw new Error(`Failed to create bulk job: ${response.statusText}`);
   }
   console.log(`Created bulk job:`, response);
   return response.json();
@@ -44,7 +48,9 @@ async function checkJobStatus(jobId) {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to check job status: ${response.statusText}`);
+    //throw new Error(`Failed to check job status: ${response.statusText}`);
+    await updateStatus('error', `checking job status ${String(response)}`, jobId);
+
   }
   console.log(`Created checkJobStatus job: ${response}`);
 
@@ -60,7 +66,9 @@ async function getQueryResults(jobId) {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to get query results: ${response.statusText}`);
+    await updateStatus('error', `query result ${String(response)}`, jobId);
+
+    //throw new Error(`Failed to get query results: ${response.statusText}`);
   }
 
   // Get the text content directly since undici doesn't support .body.on
