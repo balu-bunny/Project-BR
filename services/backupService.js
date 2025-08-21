@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const csv = require('csv-parser');
 //const fetch = require('node-fetch');
-const { fetch } = require('undici');
+const fetch =  require('../util/fetchWrapper');//require('undici');
 // ...rest of your code
 require('dotenv').config(); // must be at the top
 
@@ -19,6 +19,7 @@ async function createBulkJob(objectName, query) {
     contentType: 'CSV',
     query
   };
+console.log('typeof fetch =', typeof fetch);
 
   console.log(INSTANCE_URL,query);
   const response = await fetch(`${INSTANCE_URL}/services/data/v60.0/jobs/query`, {
