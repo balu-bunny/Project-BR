@@ -6,7 +6,67 @@ const workItemModel = require('../models/workItemModel');
 const path = require('path');
 const fs = require('fs');
 const csv = require('csv-parser');
+//const fetch = require('node-fetch');
+const { fetch } = require('undici');
+// ...rest of your code
 require('dotenv').config(); // must be at the top
+
+async function createBulkJob(objectName, query) {
+  const jobRequest = {
+    operation: 'query', 
+    contentType: 'CSV',
+    query
+  };
+
+  console.log(INSTANCE_URL,query);
+  const response = await fetch(`${INSTANCE_URL}/services/data/v60.0/jobs/query`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${ACCESS_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(jobRequest)
+  });
+  console.log(`Created bulk job:`,response);
+
+  if (!response.ok) {
+    throw new Error(`Failed to create bulk job: ${response.statusText}`);
+  }
+  console.log(`Created bulk job:`, response);
+  return response.json();
+}
+
+async function checkJobStatus(jobId) {
+  const response = await fetch(`${INSTANCE_URL}/services/data/v60.0/jobs/query/${jobId}`, {
+    headers: {
+      'Authorization': `Bearer ${ACCESS_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to check job status: ${response.statusText}`);
+  }
+  console.log(`Created checkJobStatus job: ${response}`);
+
+  return response.json();
+}
+
+async function getQueryResults(jobId) {
+  const response = await fetch(`${INSTANCE_URL}/services/data/v60.0/jobs/query/${jobId}/results`, {
+    headers: {
+      'Authorization': `Bearer ${ACCESS_TOKEN}`,
+      'Accept': 'text/csv'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get query results: ${response.statusText}`);
+  }
+
+  // Get the text content directly since undici doesn't support .body.on
+  const csvContent = await response.text();
+  return Buffer.from(csvContent);
+}
 
 function updateEnvVariable(key, value) {
   const envFilePath = '.env';
@@ -248,24 +308,56 @@ async function performBackup({ orgId, objectName, backupType }) {
       }
     }
 
+    initSalesforceAuth(orgId);
+    // Export & Upload
+
+    // const fileName = `export-${objectName}-${fileSafeTime}.csv`;
+    // const exportCommand = `sf data export bulk --query "${query}" --output-file ${fileName} --wait 10000 --target-org ${orgId}`;
+    // const uploadCommand = `aws s3 mv ${fileName} s3://${S3_BUCKET}/${orgId}/${objectName}/ --region ${awsRegion}`;
+    // console.log(uploadCommand);
+    // const fullCommand = `${exportCommand} && ${uploadCommand}`;
+
+    // const fullCommandOutput = execSync(fullCommand, { encoding: 'utf-8' });
+    // console.log(`Backup command output for ${objectName}:`, fullCommandOutput);
+
+// Create bulk job
+    const bulkJob = await createBulkJob(objectName, query);
+    console.log(`Created bulk job: ${bulkJob.id}`);
+
+    // Poll for job completion
+    let jobStatus;
+    do {
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds between polls
+      jobStatus = await checkJobStatus(bulkJob.id);
+      console.log(`Job status: ${jobStatus.state}`);
+    } while (jobStatus.state !== 'JobComplete' && jobStatus.state !== 'Failed');
+
+    if (jobStatus.state === 'Failed') {
+      throw new Error(`Bulk job failed: ${jobStatus.errorMessage}`);
+    }
+
+    // Download results
+    const fileName = `export-${objectName}-${fileSafeTime}.csv`;
+    const localPath = path.join(process.cwd(), fileName);
+
+    // Get the CSV data
+    const csvData = await getQueryResults(bulkJob.id);
+    
+    // Write to file
+    fs.writeFileSync(localPath, csvData);
+
+    // Upload to S3
+    const uploadCommand = `aws s3 mv ${fileName} s3://${S3_BUCKET}/${orgId}/${objectName}/ --region ${awsRegion}`;
+    execSync(uploadCommand, { stdio: 'inherit' });
 
     // Export & Upload
-    const fileName = `export-${objectName}-${fileSafeTime}.csv`;
-    const exportCommand = `sf data export bulk --query "${query}" --output-file ${fileName} --wait 10000 --target-org ${orgId}`;
-    const uploadCommand = `aws s3 mv ${fileName} s3://${S3_BUCKET}/${orgId}/${objectName}/ --region ${awsRegion}`;
-    console.log(uploadCommand);
-    const fullCommand = `${exportCommand} && ${uploadCommand}`;
-
-    const fullCommandOutput = execSync(fullCommand, { encoding: 'utf-8' });
-    console.log(`Backup command output for ${objectName}:`, fullCommandOutput);
-
     await updateStatus('success', `Backup successful for ${objectName}`);
 
     if(objectName =='ContentVersion'){
       const localCsvPath = path.join('/home/ubuntu', fileName);
       let tid = randomUUID();
       await updateStatus('started', `Backup in progress for ${objectName}`, tid);
-      initSalesforceAuth(orgId);
+      
       await updateStatus('in_progress', `Backup in progress for ${objectName}`, tid);
   // Download the file from S3
       const downloadCommand = `aws s3 cp s3://${S3_BUCKET}/${orgId}/${objectName}/${fileName} ${localCsvPath} --region ${awsRegion}`;
