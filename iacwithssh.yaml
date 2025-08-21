@@ -144,6 +144,11 @@ Resources:
                 KeyType: HASH
             Projection:
               ProjectionType: ALL
+        TimeToLiveSpecification: !If 
+          - TTL_Enabled
+          - AttributeName: ExpiresAt
+            Enabled: true
+          - !Ref AWS::NoValue
         Tags:
           - Key: Name
             Value: QPMSProcessTable

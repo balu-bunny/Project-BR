@@ -8,12 +8,15 @@ const TABLE_NAME = 'ProcessLogTable-BackUpAndRestore'; // ✅ Replace with your 
 // Log to DynamoDB
 async function logToDynamo({ pid, command, type, status }) {
   const id = uuidv4();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hour from now
+
   const item = {
     PK: { S: `PROCESS#${id}` },
     PID: { S: pid.toString() },
     Command: { S: command },
     Type: { S: type },
     status: { S: status },
+    ExpiresAt : { S: expiresAt },
     CreatedAt: { S: new Date().toISOString() },
   };
 

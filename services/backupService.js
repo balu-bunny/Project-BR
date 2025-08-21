@@ -194,7 +194,7 @@ async function performBackup({ orgId, objectName, backupType }) {
   const id = randomUUID();
   const timestamp = new Date().toISOString();
   const fileSafeTime = timestamp.replace(/T/, '_').replace(/:/g, '-').split('.')[0];
-
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hour from now
   const baseParams = {
     TableName: STATUS_TABLE,
     Item: {
@@ -204,7 +204,7 @@ async function performBackup({ orgId, objectName, backupType }) {
       orgId,
       timestamp, // store for future incremental/differential
       backupType,
-      ExpiresAt: timestamp,
+      ExpiresAt: expiresAt,
       description: `Backup for ${objectName} on org ${orgId}`,
     },
   };
