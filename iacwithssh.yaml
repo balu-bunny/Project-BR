@@ -360,6 +360,14 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           apt update -y
+          sudo fallocate -l 2G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          swapon --show
+          free -h
+          echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
+          echo "vm.swappiness=10" | sudo tee -a /etc/sysctl.conf
           curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
           apt install -y nodejs git unzip nginx
           npm install -g @salesforce/cli
