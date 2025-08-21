@@ -369,7 +369,7 @@ Resources:
           npm install express
           npm install dotenv
           npm install csv-parser
-          npm install node-fetch
+          npm install undici
           npm install -g pm2
           pm2 start app.js
           pm2 save
