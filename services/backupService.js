@@ -11,6 +11,28 @@ const fetch =  require('../util/fetchWrapper');//require('undici');
 // ...rest of your code
 require('dotenv').config(); // must be at the top
 
+
+function movePm2LogsToS3(bucketName) {
+  const LOG_DIR = '/home/ubuntu/.pm2/logs';
+  const DATE = new Date().toISOString().replace(/[:.]/g, '-');
+  const ARCHIVE = `/tmp/pm2-logs-${DATE}.tar.gz`;
+
+  try {
+    console.log('📦 Archiving PM2 logs...');
+    execSync(`tar -czf ${ARCHIVE} -C ${LOG_DIR} .`, { stdio: 'inherit' });
+
+    console.log(`☁️  Uploading logs to s3://${bucketName}/pm2-logs/ ...`);
+    execSync(`aws s3 mv ${ARCHIVE} s3://${bucketName}/pm2-logs/`, { stdio: 'inherit' });
+
+    console.log('🧹 Flushing PM2 logs...');
+    execSync('pm2 flush', { stdio: 'inherit' });
+
+    console.log('✅ Logs archived, uploaded, and flushed successfully.');
+  } catch (err) {
+    console.error('❌ Error while moving logs:', err);
+  }
+}
+
 async function createBulkJob(objectName, query) {
     const id = randomUUID();
 
@@ -400,8 +422,9 @@ async function performBackup({ orgId, objectName, backupType }) {
  * Express route handler
  */
 const processBackup = async (req, res) => {
-  console.log('Received backup request:', req.body);
 
+  console.log('Received backup request:', req.body);
+  movePm2LogsToS3(S3_BUCKET);
   const { orgId, objects, cloud, backupType } = req.body;
 
   if (!orgId || !objects || objects.length === 0) {

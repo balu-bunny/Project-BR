@@ -359,6 +359,10 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
+          set -euo pipefail
+          exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+
+          #aws s3 cp /var/log/user-data.log s3://myapp-bucket-us-east-1-767900165297/logs/user-data.log
           sudo apt update -y
 
           # ---- SWAP ----
@@ -373,7 +377,7 @@ Resources:
 
           # ---- Install base software ----
           curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-          apt install -y nodejs git unzip nginx
+          sudo apt install -y nodejs git unzip nginx
           wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
           sudo dpkg -i amazon-cloudwatch-agent.deb
           npm install -g @salesforce/cli
@@ -388,14 +392,24 @@ Resources:
           git clone https://github.com/balu-bunny/Project-BR.git
           cd Project-BR
           npm install
-          pm2 start app.js --name salesforce-backup
-          pm2 save
-          pm2 startup systemd -u ubuntu --hp /home/ubuntu
 
           # ---- Metadata ----
           TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
           PUBLIC_DNS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-hostname)
           REGION=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}')
+
+          #pm2 
+          sudo -i -u ubuntu bash <<'EOF'
+          cd /home/ubuntu/Project-BR
+          pm2 start app.js --name salesforce-backup
+          pm2 save
+          pm2 startup systemd -u ubuntu --hp /home/ubuntu
+          #sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu -k
+          EOF
+          sudo systemctl enable pm2-ubuntu
+          sudo systemctl restart pm2-ubuntu
+          echo 'pm2 is done'
+
 
           # ---- Save env.json ----
           echo '{
@@ -423,9 +437,14 @@ Resources:
           systemctl restart nginx
           systemctl enable nginx
           apt install -y certbot python3-certbot-nginx
-          certbot --nginx --non-interactive --agree-tos --redirect \
-            --email balakrishna@qualityze.com \
-            -d $PUBLIC_DNS
+          if certbot --nginx --non-interactive --agree-tos --redirect \
+          --email balakrishna@qualityze.com \
+          -d $PUBLIC_DNS; then
+            echo "✅ SSL configured"
+          else
+              echo "⚠️ Certbot failed, continuing without SSL"
+          fi
+
 
           # ---- CloudWatch Agent Config ----
           sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc
@@ -483,6 +502,9 @@ Resources:
             -a fetch-config -m ec2 \
             -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
             -s
+          sudo systemctl enable amazon-cloudwatch-agent
+          sudo systemctl restart amazon-cloudwatch-agent
+
 
 
   QPMSS3Bucket:
