@@ -359,7 +359,9 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          apt update -y
+          sudo apt update -y
+
+          # ---- SWAP ----
           sudo fallocate -l 2G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
@@ -368,44 +370,46 @@ Resources:
           free -h
           echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
           echo "vm.swappiness=10" | sudo tee -a /etc/sysctl.conf
+
+          # ---- Install base software ----
           curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
           apt install -y nodejs git unzip nginx
+          wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+          sudo dpkg -i amazon-cloudwatch-agent.deb
           npm install -g @salesforce/cli
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           ./aws/install
           npm install -g @aws-sdk/client-s3 @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+          npm install -g pm2
+
+          # ---- Clone repo & start app ----
           cd /home/ubuntu
           git clone https://github.com/balu-bunny/Project-BR.git
           cd Project-BR
-          npm init -y
-          npm install express
-          npm install dotenv
-          npm install csv-parser
-          npm install undici
-          npm install -g pm2
-          pm2 start app.js
+          npm install
+          pm2 start app.js --name salesforce-backup
           pm2 save
-          pm2 startup
+          pm2 startup systemd -u ubuntu --hp /home/ubuntu
 
+          # ---- Metadata ----
           TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-
           PUBLIC_DNS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-hostname)
+          REGION=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}')
 
-          REGION=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/dynamic/instance-identity/document |  grep region | awk -F\" '{print $4}')
-
-          # Save the region in env.json
-          echo "{\"region\": \"$REGION\"}" > env.json
+          # ---- Save env.json ----
           echo '{
             "region": "'$REGION'",
             "userPoolId": "${QPMSUserPool}",
             "userPoolClientId": "${QPMSUserPoolClient}",
             "identityPoolId": "${QPMSIdentityPool}"
           }' > /home/ubuntu/Project-BR/env.json
+
+          # ---- Nginx ----
           cat > /etc/nginx/sites-available/default <<EOF
           server {
               listen 80;
-              server_name \$PUBLIC_DNS;
+              server_name $PUBLIC_DNS;
               location / {
                   proxy_pass http://localhost:3000;
                   proxy_http_version 1.1;
@@ -421,7 +425,65 @@ Resources:
           apt install -y certbot python3-certbot-nginx
           certbot --nginx --non-interactive --agree-tos --redirect \
             --email balakrishna@qualityze.com \
-            -d \$PUBLIC_DNS
+            -d $PUBLIC_DNS
+
+          # ---- CloudWatch Agent Config ----
+          sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc
+          cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<EOF
+          {
+            "logs": {
+              "logs_collected": {
+                "files": {
+                  "collect_list": [
+                    {
+                      "file_path": "/home/ubuntu/.pm2/logs/salesforce-backup-out.log",
+                      "log_group_name": "/Project-BR/pm2/out",
+                      "log_stream_name": "{instance_id}",
+                      "retention_in_days": 30
+                    },
+                    {
+                      "file_path": "/home/ubuntu/.pm2/logs/salesforce-backup-error.log",
+                      "log_group_name": "/Project-BR/pm2/error",
+                      "log_stream_name": "{instance_id}",
+                      "retention_in_days": 30
+                    },
+                    {
+                      "file_path": "/var/log/nginx/access.log",
+                      "log_group_name": "/Project-BR/nginx/access",
+                      "log_stream_name": "{instance_id}",
+                      "retention_in_days": 14
+                    },
+                    {
+                      "file_path": "/var/log/nginx/error.log",
+                      "log_group_name": "/Project-BR/nginx/error",
+                      "log_stream_name": "{instance_id}",
+                      "retention_in_days": 14
+                    },
+                    {
+                      "file_path": "/var/log/syslog",
+                      "log_group_name": "/Project-BR/system/syslog",
+                      "log_stream_name": "{instance_id}",
+                      "retention_in_days": 14
+                    },
+                    {
+                      "file_path": "/var/log/auth.log",
+                      "log_group_name": "/Project-BR/system/auth",
+                      "log_stream_name": "{instance_id}",
+                      "retention_in_days": 14
+                    }
+                  ]
+                }
+              }
+            }
+          }
+          EOF
+
+          # ---- Start CloudWatch Agent ----
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+            -a fetch-config -m ec2 \
+            -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
+            -s
+
 
   QPMSS3Bucket:
     Type: AWS::S3::Bucket
@@ -442,6 +504,22 @@ Resources:
                   - AES256
         - !Ref AWS::NoValue
 
+  CWAgentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+
+  CWInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [ !Ref CWAgentRole ]
 
 
 Outputs:
