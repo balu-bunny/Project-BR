@@ -28,7 +28,7 @@ node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 
 node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['ContentVersion'], orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
 
 
-node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['QPMSINT2__Audit_History__b'], orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
+node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objects: ['Account'], orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
 
 
 

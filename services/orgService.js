@@ -21,14 +21,35 @@ exports.fetchOrgList = () => {
   });
 };
 
+exports.getOrgAuth = () => {
+  return new Promise((resolve, reject) => {
+    exec('sf org list --json', (err, stdout) => {
+      if (err) return reject(new Error('Failed to fetch org list'));
+
+      try {
+        const parsed = JSON.parse(stdout);
+        const orgs = (parsed.result?.nonScratchOrgs || []).map(org => ({
+          id: org.username,
+          name: org.alias || org.username,
+          type: org.isSandbox ? 'Sandbox' : 'Production',
+          scheduledTask: null
+        }));
+        resolve(orgs);
+      } catch (e) {
+        reject(new Error('Invalid JSON format'));
+      }
+    });
+  });
+};
+
 exports.handleLogin =  (req, res) => {
   console.log('Handling login for org:'+req.body);
-  const { orgId, type } = req.body.params || {};
+  const { orgId, instanceUrl } = req.body.params || {};
 
   console.log('Handling login for org:'+orgId);
   console.log(orgId);
 
-  const login = spawn('sf', ['org', 'login', 'device', '--alias', orgId], {
+  const login = spawn('sf', ['org', 'login', 'access-token','--instance-url', instanceUrl, '--alias', orgId], {
     shell: true
   });//warning! remove shell: true once UI is developed 
 

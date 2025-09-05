@@ -13,3 +13,19 @@ node -e "fetch('http://localhost:3000/api/backup', { method: 'POST', headers: { 
 unix
 
 systemctl status cron
+
+
+
+
+restart pm2 
+pm2 resurrect
+
+
+clean cache
+sudo apt-get clean
+
+clean system logs
+sudo truncate -s 0 /var/log/*.log
+sudo rm -rf /var/log/*.gz /var/log/*.[0-9]
+
+

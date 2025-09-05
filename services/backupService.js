@@ -10,7 +10,8 @@ const csv = require('csv-parser');
 const fetch =  require('../util/fetchWrapper');//require('undici');
 // ...rest of your code
 require('dotenv').config(); // must be at the top
-
+//import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 function movePm2LogsToS3(bucketName) {
   const LOG_DIR = '/home/ubuntu/.pm2/logs';
@@ -154,6 +155,7 @@ try {
 } catch (err) {
   console.error('Failed to get AWS region:', err.message);
 }
+const s3 = new S3Client({ region: awsRegion });
 
 // Build S3 bucket name dynamically
 const S3_BUCKET = process.env.S3_BUCKET || `myapp-bucket-${awsRegion}-${accountId}`;
@@ -191,7 +193,35 @@ function initSalesforceAuth(myAlias) {
     { encoding: 'utf-8' }
   ).trim();
 }
+async function downloadFileAndUploadToS3(contentVersionId, title, filePath, orgId) {
+  const safeTitle = title.replace(/[^\w.-]/g, "_");
+  const s3Key = `${orgId}/ContentVersion/${filePath}/${safeTitle}`;
+  const url = `${INSTANCE_URL}/services/data/v60.0/sobjects/ContentVersion/${contentVersionId}/VersionData`;
 
+  try {
+    console.log(`Downloading ${safeTitle}...`);
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch file: ${res.status} ${res.statusText}`);
+    }
+
+    console.log(`Uploading ${safeTitle} to S3...`);
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: s3Key,
+        Body: res.body, // stream directly
+      })
+    );
+
+    console.log(`✅ ${safeTitle} uploaded to s3://${S3_BUCKET}/${s3Key}`);
+  } catch (err) {
+    console.error(`Failed for ${safeTitle}:`, err.message);
+  }
+}
 function downloadFileAndMoveToS3(contentVersionId, title, filePath, orgId) {
   const safeTitle = title.replace(/[^\w.-]/g, '_');
   const localPath = path.join('/home/ubuntu', safeTitle);
@@ -401,6 +431,7 @@ async function performBackup({ orgId, objectName, backupType }) {
           // Process each row here
           console.log('Row:', row);
           downloadFileAndMoveToS3(row.Id, row.Title, `export-${objectName}-${fileSafeTime}`, orgId);
+          //downloadFileAndUploadToS3(row.Id, row.Title, `export-${objectName}-${fileSafeTime}`, orgId);
 
         })
         .on('end', () => {
