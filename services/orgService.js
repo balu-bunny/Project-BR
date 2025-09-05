@@ -44,13 +44,17 @@ exports.getOrgAuth = () => {
 
 exports.handleLogin =  (req, res) => {
   console.log('Handling login for org:'+req.body);
-  const { orgId, instanceUrl } = req.body.params || {};
+  const { orgId, instanceUrl, accessToken } = req.body.params || {};
 
   console.log('Handling login for org:'+orgId);
-  console.log(orgId);
+  console.log(orgId,instanceUrl,accessToken);
 
-  const login = spawn('sf', ['org', 'login', 'access-token','--instance-url', instanceUrl, '--alias', orgId], {
-    shell: true
+  const login = spawn('sf', ['org', 'login', 'access-token','--instance-url', instanceUrl, '--alias', orgId,'--no-prompt'], {
+    shell: true,
+  env: {
+    ...process.env,
+    SF_ACCESS_TOKEN: accessToken   // 👈 inject token here
+  }
   });//warning! remove shell: true once UI is developed 
 
   let output = '';

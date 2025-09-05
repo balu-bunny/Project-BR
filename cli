@@ -19,7 +19,7 @@ sudo bash -c 'nohup node app.js > app.log 2>&1 &'
 
 cd Project-BR
 node -e "fetch('http://localhost:3000/api/orgs').then(res => res.json()).then(console.log)"
-node connection.js POST addNewOrg source
+node connection.js POST addNewOrg source https://qpmsint2-dev-ed.my.salesforce.com 00D6A000000tN5R!AR8AQO7R_kJj0UMgeoTtVBRtqt_LY6iprtsnoSd6bVpuWJIMVCIGF9rvDJOhi0tHydlPDp03dP9pXOMioPrYC9Uu8x4cQscF
 
 node -e "fetch('http://localhost:3000/api/addNewOrg', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: ['Account'], orgId:'source' }) }).then(res => res.json()).then(data => console.log(data)).catch(err => console.error(err))";
 

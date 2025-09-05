@@ -32,7 +32,7 @@ console.log('Usage: node call-api.js '+orgId+'---'+endpoint+'---'+method);
     }else if(method.toUpperCase() === 'POST') {
         console.log('Type is required for POST method'+orgId);
         response = await axios.post(endpointURL, {
-        params: { orgId }
+          params: { orgId: process.argv[4], instanceUrl: process.argv[5], accessToken: process.argv[6] }
         });
     }
 
