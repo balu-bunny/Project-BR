@@ -12,6 +12,11 @@ const fetch =  require('../util/fetchWrapper');//require('undici');
 require('dotenv').config(); // must be at the top
 //import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { pipeline } = require('stream');
+const { promisify } = require('util');
+
+const streamPipeline = promisify(pipeline);
+
 
 function movePm2LogsToS3(bucketName) {
   const LOG_DIR = '/home/ubuntu/.pm2/logs';
@@ -81,7 +86,7 @@ async function checkJobStatus(jobId) {
   return response.json();
 }
 
-async function getQueryResults(jobId) {
+async function getQueryResults(jobId,filePath) {
   const response = await fetch(`${INSTANCE_URL}/services/data/v60.0/jobs/query/${jobId}/results`, {
     headers: {
       'Authorization': `Bearer ${ACCESS_TOKEN}`,
@@ -96,8 +101,12 @@ async function getQueryResults(jobId) {
   }
 
   // Get the text content directly since undici doesn't support .body.on
-  const csvContent = await response.text();
-  return Buffer.from(csvContent);
+  // const csvContent = await response.text();
+  // return Buffer.from(csvContent);
+    //const filePath = `./results_${jobId}.csv`;
+    await streamPipeline(response.body, fs.createWriteStream(filePath));
+
+    return filePath;
 }
 
 function updateEnvVariable(key, value) {
@@ -402,10 +411,10 @@ async function performBackup({ orgId, objectName, backupType }) {
     const localPath = path.join(process.cwd(), fileName);
 
     // Get the CSV data
-    const csvData = await getQueryResults(bulkJob.id);
-    
+    const csvData = await getQueryResults(bulkJob.id, localPath);
+
     // Write to file
-    fs.writeFileSync(localPath, csvData);
+    //fs.writeFileSync(localPath, csvData);
 
     // Upload to S3
     const uploadCommand = `aws s3 mv ${fileName} s3://${S3_BUCKET}/${orgId}/${objectName}/ --region ${awsRegion}`;
