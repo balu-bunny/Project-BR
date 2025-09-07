@@ -18,6 +18,41 @@ const { promisify } = require('util');
 const streamPipeline = promisify(pipeline);
 
 
+  const captureException = async (status, customDescription, id) => {
+    const STATUS_TABLE = 'JobStatusTable-BackUpAndRestore';
+    const timestamp = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hour from now
+
+    const baseParams = {
+        TableName: STATUS_TABLE,
+        Item: {
+          id,
+          PID: 'backup',
+          object: 'exception',
+          orgId: 'orgId',
+          timestamp, // store for future incremental/differential
+          backupType: 'exception',
+          ExpiresAt: expiresAt,
+          description: `Backup for ${objectName} on org ${orgId}`,
+        },
+      };
+
+
+    baseParams.Item.status = status;
+    baseParams.Item.id = id || baseParams.Item.id;
+    customDescription = customDescription ? customDescription + `Backup ${status} for ${objectName} on org ${orgId}` : `Backup ${status} for ${objectName} on org ${orgId}`;
+    baseParams.Item.description = customDescription || baseParams.Item.description;
+    return workItemModel.insertWorkItem({
+      ...baseParams,
+      Item: {
+        ...baseParams.Item,
+        status,
+        description: customDescription || baseParams.Item.description,
+      },
+    });
+  };
+
+
 function movePm2LogsToS3(bucketName) {
   const LOG_DIR = '/home/ubuntu/.pm2/logs';
   const DATE = new Date().toISOString().replace(/[:.]/g, '-');
@@ -26,10 +61,16 @@ function movePm2LogsToS3(bucketName) {
   try {
     console.log('📦 Archiving PM2 logs...');
     execSync(`tar -czf ${ARCHIVE} -C ${LOG_DIR} .`, { stdio: 'inherit' });
-
+  } catch (err) {
+    console.error('❌ Error while archiving logs:', err);
+  }
+  try {
     console.log(`☁️  Uploading logs to s3://${bucketName}/pm2-logs/ ...`);
     execSync(`aws s3 mv ${ARCHIVE} s3://${bucketName}/pm2-logs/`, { stdio: 'inherit' });
-
+  } catch (err) {
+    console.error('❌ Error while uploading logs:', err);
+  }
+  try {
     console.log('🧹 Flushing PM2 logs...');
     execSync('pm2 flush', { stdio: 'inherit' });
 
@@ -39,7 +80,7 @@ function movePm2LogsToS3(bucketName) {
   }
 }
 
-async function createBulkJob(objectName, query) {
+async function createBulkJob(objectName, query, orgId) {
     const id = randomUUID();
 
   const jobRequest = {
@@ -49,11 +90,18 @@ async function createBulkJob(objectName, query) {
   };
 console.log('typeof fetch =', typeof fetch);
 
-  console.log(INSTANCE_URL,query);
-  const response = await fetch(`${INSTANCE_URL}/services/data/v60.0/jobs/query`, {
+const { accessToken, instanceUrl } = orgAuthMap.get(orgId) || {};
+
+  if (!accessToken || !instanceUrl) {
+    console.error(`No auth found for org ${orgId}`);
+    return;
+  }
+
+  console.log(instanceUrl,query);
+  const response = await fetch(`${instanceUrl}/services/data/v60.0/jobs/query`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${ACCESS_TOKEN}`,
+      'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(jobRequest)
@@ -61,7 +109,8 @@ console.log('typeof fetch =', typeof fetch);
   console.log(`Created bulk job:`,response);
 
   if (!response.ok) {
-        await updateStatus('error', `${objectName} ${query} response: ${String(response)}`, id);
+    console.error(`Failed to create bulk job: ${response.status} ${response.statusText}`);
+    await captureException('error', `${objectName} ${query} response: ${String(response)}`, id);
 
     //throw new Error(`Failed to create bulk job: ${response.statusText}`);
   }
@@ -69,16 +118,24 @@ console.log('typeof fetch =', typeof fetch);
   return response.json();
 }
 
-async function checkJobStatus(jobId) {
-  const response = await fetch(`${INSTANCE_URL}/services/data/v60.0/jobs/query/${jobId}`, {
+async function checkJobStatus(jobId, orgId) {
+  const { accessToken, instanceUrl } = orgAuthMap.get(orgId) || {};
+
+  if (!accessToken || !instanceUrl) {
+    console.error(`No auth found for org ${orgId} ${jobId}`);
+    return;
+  }
+  const response = await fetch(`${instanceUrl}/services/data/v60.0/jobs/query/${jobId}`, {
     headers: {
-      'Authorization': `Bearer ${ACCESS_TOKEN}`
+      'Authorization': `Bearer ${accessToken}`
     }
   });
 
   if (!response.ok) {
     //throw new Error(`Failed to check job status: ${response.statusText}`);
-    await updateStatus('error', `checking job status ${String(response)}`, jobId);
+    console.error(`Failed to check job status: ${response.status} ${response.statusText} ${jobId}`);
+    
+    await captureException('error', `checking job status ${String(response)}`, jobId);
 
   }
   console.log(`Created checkJobStatus job: ${response}`);
@@ -86,16 +143,23 @@ async function checkJobStatus(jobId) {
   return response.json();
 }
 
-async function getQueryResults(jobId,filePath) {
-  const response = await fetch(`${INSTANCE_URL}/services/data/v60.0/jobs/query/${jobId}/results`, {
+async function getQueryResults(jobId,filePath,orgId) {
+  const { accessToken, instanceUrl } = orgAuthMap.get(orgId) || {};
+
+  if (!accessToken || !instanceUrl) {
+    console.error(`No auth found for org ${orgId}`);
+    return;
+  }
+  const response = await fetch(`${instanceUrl}/services/data/v60.0/jobs/query/${jobId}/results`, {
     headers: {
-      'Authorization': `Bearer ${ACCESS_TOKEN}`,
+      'Authorization': `Bearer ${accessToken}`,
       'Accept': 'text/csv'
     }
   });
 
   if (!response.ok) {
-    await updateStatus('error', `query result ${String(response)}`, jobId);
+    console.error(`Failed to get query results: ${response.status} ${response.statusText}`);
+    await captureException('error', `query result ${String(response)}`, jobId);
 
     //throw new Error(`Failed to get query results: ${response.statusText}`);
   }
@@ -179,8 +243,8 @@ const isPlatformEvent = (objectName) =>
 async function getLastBackupTimestamp(orgId, objectName) {
   try {
     const lastRecord = await workItemModel.getLastWorkItem(orgId, objectName);
-    if (lastRecord && lastRecord.Item && lastRecord.Item.timestamp) {
-      return lastRecord.Item.timestamp;
+    if (lastRecord && lastRecord.timestamp) {
+      return lastRecord.timestamp;
     }
   } catch (err) {
     console.warn(`No last backup timestamp found for ${objectName} in ${orgId}`);
@@ -188,29 +252,38 @@ async function getLastBackupTimestamp(orgId, objectName) {
   return null;
 }
 
-let ACCESS_TOKEN = '';
-let INSTANCE_URL = '';
+const orgAuthMap = new Map();
 
 function initSalesforceAuth(myAlias) {
-  ACCESS_TOKEN = execSync(
+  const accessToken = execSync(
     `sf org display --target-org ${myAlias} --json | jq -r ".result.accessToken"`,
     { encoding: 'utf-8' }
   ).trim();
 
-  INSTANCE_URL = execSync(
+  const instanceUrl = execSync(
     `sf org display --target-org ${myAlias} --json | jq -r ".result.instanceUrl"`,
     { encoding: 'utf-8' }
   ).trim();
+
+  orgAuthMap.set(myAlias, { accessToken, instanceUrl });
 }
 async function downloadFileAndUploadToS3(contentVersionId, title, filePath, orgId) {
+
+  const { accessToken, instanceUrl } = orgAuthMap.get(orgId) || {};
+
+  if (!accessToken || !instanceUrl) {
+    console.error(`No auth found for org ${orgId}`);
+    return;
+  }
+
   const safeTitle = title.replace(/[^\w.-]/g, "_");
   const s3Key = `${orgId}/ContentVersion/${filePath}/${safeTitle}`;
-  const url = `${INSTANCE_URL}/services/data/v60.0/sobjects/ContentVersion/${contentVersionId}/VersionData`;
+  const url = `${instanceUrl}/services/data/v60.0/sobjects/ContentVersion/${contentVersionId}/VersionData`;
 
   try {
     console.log(`Downloading ${safeTitle}...`);
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     if (!res.ok) {
@@ -237,8 +310,16 @@ function downloadFileAndMoveToS3(contentVersionId, title, filePath, orgId) {
   const s3Key = `${orgId}/ContentVersion/${filePath}/${safeTitle}`;
 
   // Download file from Salesforce
-  const curlCmd = `curl -s -L "${INSTANCE_URL}/services/data/v60.0/sobjects/ContentVersion/${contentVersionId}/VersionData" \
-    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+
+  const { accessToken, instanceUrl } = orgAuthMap.get(orgId) || {};
+
+  if (!accessToken || !instanceUrl) {
+    console.error(`No auth found for org ${orgId}`);
+    return;
+  }
+
+  const curlCmd = `curl -s -L "${instanceUrl}/services/data/v60.0/sobjects/ContentVersion/${contentVersionId}/VersionData" \
+    -H "Authorization: Bearer ${accessToken}" \
     --output "${localPath}"`;
 
   // Move file to S3
@@ -282,6 +363,7 @@ async function performBackup({ orgId, objectName, backupType }) {
   const updateStatus = async (status, customDescription, id) => {
     baseParams.Item.status = status;
     baseParams.Item.id = id || baseParams.Item.id;
+    customDescription = customDescription ? customDescription + `Backup ${status} for ${objectName} on org ${orgId}` : `Backup ${status} for ${objectName} on org ${orgId}`;
     baseParams.Item.description = customDescription || baseParams.Item.description;
     return workItemModel.insertWorkItem({
       ...baseParams,
@@ -336,7 +418,7 @@ async function performBackup({ orgId, objectName, backupType }) {
     let countQuery = `SELECT Count() FROM ${objectName}`;
     let clause = '';
 
-    let LastModifiedDate = 'LastModifiedDate';
+    let LastModifiedDate = 'SystemModstamp';
 
     if(objectName.endsWith('__b')){
       LastModifiedDate = 'QPMS__CreatedDate__c'; // Use CreatedDate for initial backups
@@ -346,11 +428,13 @@ async function performBackup({ orgId, objectName, backupType }) {
       clause += ` WHERE ${LastModifiedDate} = TODAY`;
     } else if (backupType === 'Differential') {
       const lastBackup = await getLastBackupTimestamp(orgId, objectName);
+      console.log('lastBackup for differential:', lastBackup);
       if (lastBackup) {
         clause += ` WHERE ${LastModifiedDate} >= ${lastBackup}`;
       } else {
-        clause += ` WHERE ${LastModifiedDate} >= LAST_N_DAYS:7`; // default if no history
+        console.log('no clause it will query from begning'); // default if no history
       }
+      console.log('clause for differential:', clause);
     } else if (backupType === 'Incremental') {
       const lastBackup = await getLastBackupTimestamp(orgId, objectName);
       if (lastBackup) {
@@ -391,14 +475,14 @@ async function performBackup({ orgId, objectName, backupType }) {
     // console.log(`Backup command output for ${objectName}:`, fullCommandOutput);
 
 // Create bulk job
-    const bulkJob = await createBulkJob(objectName, query);
+    const bulkJob = await createBulkJob(objectName, query, orgId);
     console.log(`Created bulk job: ${bulkJob.id}`);
 
     // Poll for job completion
     let jobStatus;
     do {
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds between polls
-      jobStatus = await checkJobStatus(bulkJob.id);
+      jobStatus = await checkJobStatus(bulkJob.id, orgId);
       console.log(`Job status: ${jobStatus.state}`);
     } while (jobStatus.state !== 'JobComplete' && jobStatus.state !== 'Failed');
 
@@ -407,16 +491,17 @@ async function performBackup({ orgId, objectName, backupType }) {
     }
 
     // Download results
-    const fileName = `export-${objectName}-${fileSafeTime}.csv`;
+    const fileName = `export-${orgId}-${objectName}-${fileSafeTime}.csv`;
     const localPath = path.join(process.cwd(), fileName);
 
     // Get the CSV data
-    const csvData = await getQueryResults(bulkJob.id, localPath);
+    const csvData = await getQueryResults(bulkJob.id, localPath, orgId);
 
     // Write to file
     //fs.writeFileSync(localPath, csvData);
 
     // Upload to S3
+    console.log(`Uploading results to s3://${S3_BUCKET}/${orgId}/${objectName}/ ...`);
     const uploadCommand = `aws s3 mv ${fileName} s3://${S3_BUCKET}/${orgId}/${objectName}/ --region ${awsRegion}`;
     execSync(uploadCommand, { stdio: 'inherit' });
 
@@ -466,7 +551,7 @@ const processBackup = async (req, res) => {
   console.log('Received backup request:', req.body);
   movePm2LogsToS3(S3_BUCKET);
   const { orgId, objects, cloud, backupType } = req.body;
-
+  console.log('orgId, objects, cloud, backupType', orgId, objects, cloud, backupType);
   if (!orgId || !objects || objects.length === 0) {
     return res
       .status(400)

@@ -82,30 +82,40 @@ Resources:
         - AttributeName: status
           AttributeType: S
         - AttributeName: PID
-          AttributeType: S 
+          AttributeType: S
+        - AttributeName: orgId              # 👈 Added this
+          AttributeType: S
       KeySchema:
         - AttributeName: id
           KeyType: HASH
       GlobalSecondaryIndexes:
-          - IndexName: ByType
-            KeySchema:
-              - AttributeName: object
-                KeyType: HASH
-              - AttributeName: status
-                KeyType: RANGE  
-            Projection:
-              ProjectionType: ALL
-          - IndexName: ByPID
-            KeySchema:
-              - AttributeName: PID
-                KeyType: HASH
-            Projection:
-              ProjectionType: ALL
-      TimeToLiveSpecification: !If 
-        - TTL_Enabled
-        - AttributeName: ExpiresAt
-          Enabled: true
-        - !Ref AWS::NoValue
+        - IndexName: ByType
+          KeySchema:
+            - AttributeName: object
+              KeyType: HASH
+            - AttributeName: status
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: ByPID
+          KeySchema:
+            - AttributeName: PID
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: ByOrgObjectStatus
+          KeySchema:
+            - AttributeName: orgId
+              KeyType: HASH
+            - AttributeName: object
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      # TimeToLiveSpecification: !If
+      #   - TTL_Enabled
+      #   - AttributeName: ExpiresAt
+      #     Enabled: true
+      #   - !Ref AWS::NoValue
       Tags:
         - Key: Name
           Value: QPMSAppTable
