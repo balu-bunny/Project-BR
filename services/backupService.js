@@ -247,6 +247,7 @@ async function getLastBackupTimestamp(orgId, objectName) {
       return lastRecord.timestamp;
     }
   } catch (err) {
+    await captureException('error', `No last backup timestamp found for ${objectName} in ${orgId}`, orgId);
     console.warn(`No last backup timestamp found for ${objectName} in ${orgId}`);
   }
   return null;
