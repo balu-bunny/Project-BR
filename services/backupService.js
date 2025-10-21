@@ -426,7 +426,7 @@ async function performBackup({ orgId, objectName, backupType }) {
     }
 
     if (backupType === 'Daily') {
-      clause += ` WHERE ${LastModifiedDate} = TODAY`;
+      clause += ` WHERE ${LastModifiedDate} = YESTERDAY`;
     } else if (backupType === 'Differential') {
       const lastBackup = await getLastBackupTimestamp(orgId, objectName);
       console.log('lastBackup for differential:', lastBackup);
