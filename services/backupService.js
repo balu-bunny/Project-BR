@@ -588,7 +588,7 @@ const processBackup = async (req, res) => {
         'ProcessNode',
         'ProcessInstance',
         'ProcessInstanceStep',
-        'ProcessInstanceHistory',
+        //'ProcessInstanceHistory',
         'ProcessInstanceWorkitem',
         'ContentVersion',
         'ContentDocument',
