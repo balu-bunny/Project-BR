@@ -460,7 +460,7 @@ async function performBackup({ orgId, objectName, backupType }) {
 
       console.log(`[${objectName}] Record count ${countQuery}: ${totalRecords}`);
       if (totalRecords === 0) {
-        await updateStatus('skipped', `No records found for ${objectName}`);
+        await updateStatus('skipped', `No records found for ${objectName} ${countQuery}`);
         return;
       }
     }
