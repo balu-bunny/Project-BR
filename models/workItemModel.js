@@ -61,10 +61,11 @@ const getLastWorkItem = async (orgId, objectNameId) => {
     console.error('retrieved work item:', data.Items);
     console.error('retrieved work item:', data.Items?.[0]);
     if(data.Items.length === 0){
-        console.error('retrieved work item length = 0:');
+      console.error('retrieved work item length = 0:');
       return null;
+    }else{
+      return data.Items[0];
     }
-    return data.Items[0];
 
   } catch (err) {
     console.error('Error fetching last work item:', err);
