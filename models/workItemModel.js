@@ -41,7 +41,7 @@ const getLastWorkItem = async (orgId, objectNameId) => {
       TableName: STATUS_TABLE,
       IndexName: 'ByOrgObjectStatus',
       KeyConditionExpression: 'orgId = :org AND #obj = :obj',
-      FilterExpression: '#sta = :status or #sta = :status2',
+      //FilterExpression: '#sta = :status or #sta = :status2',
       ExpressionAttributeNames: {
         '#obj': 'object',
         '#sta': 'status'
@@ -60,7 +60,15 @@ const getLastWorkItem = async (orgId, objectNameId) => {
     console.log('getLastWorkItem params:', orgId, objectNameId);
     console.error('retrieved work item:', data.Items);
     console.error('retrieved work item:', data.Items?.[0]);
-    return data.Items?.[0] || null;
+    if(data.Items.length === 0){
+        console.error('retrieved work item length = 0:');
+      return null;
+    }
+    const filtered = data.Items.filter(
+        item => item.status === 'success' || item.status === 'started'
+    );
+    return filtered?.[0] || null;
+
   } catch (err) {
     console.error('Error fetching last work item:', err);
     console.error('Params:', orgId, objectNameId);

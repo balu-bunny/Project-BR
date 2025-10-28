@@ -22,7 +22,7 @@ sudo bash -c 'nohup node app.js > app.log 2>&1 &'
 
 cd Project-BR
 node -e "fetch('http://localhost:3000/api/orgs').then(res => res.json()).then(console.log)"
-node connection.js POST addNewOrg source https://qpmsint2-dev-ed.my.salesforce.com '00D6A000000tN5R!AR8AQAI2kz8rvaJFLKEN2L0nRSfH2X7.C1g07o8nCAU6iE1M.bEJ4ZYGk42'
+node connection.js POST addNewOrg source https://qpmsint2-dev-ed.my.salesforce.com '00D6A000000tN5R!AR8AQGBHUkgq3ZPjUkZ2V_0JXueAyl3blyK47Dxz2175YvLWOOoZfQkDVrn.WVCF1GxKiUpvwk.JBktdbgPGkkK75F.7AjkJ'
 
 node connection.js POST addNewOrg tp2 https://qualityzetp2-dev-ed.my.salesforce.com '00D1U0000011Wan!AQEAQHu7PamkjuZQD_22CrTMk3.9ntsdUzz0VcKDurjaKKJnS48nNAdV'
 

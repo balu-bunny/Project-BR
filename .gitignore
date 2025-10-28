@@ -3,3 +3,5 @@
 /ac.json
 /dynamoDbSchema.yaml
 /.env
+/test.js
+/t.mjs
