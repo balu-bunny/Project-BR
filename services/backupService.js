@@ -443,8 +443,10 @@ async function performBackup({ orgId, objectName, backupType }) {
       } else {
         clause += ` WHERE ${LastModifiedDate} >= YESTERDAY`; // default if no history
       }
+    }else if(backupType === 'Full'){
+      // No additional clause
     }
-
+    console.log('clause:', clause);
     query += clause;
     countQuery += clause;
 
