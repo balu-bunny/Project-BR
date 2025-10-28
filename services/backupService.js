@@ -458,7 +458,7 @@ async function performBackup({ orgId, objectName, backupType }) {
       );
       const totalRecords = JSON.parse(countOutput).result.totalSize;
 
-      console.log(`[${objectName}] Record count: ${totalRecords}`);
+      console.log(`[${objectName}] Record count ${countQuery}: ${totalRecords}`);
       if (totalRecords === 0) {
         await updateStatus('skipped', `No records found for ${objectName}`);
         return;
