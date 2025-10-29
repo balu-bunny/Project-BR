@@ -445,6 +445,9 @@ async function performBackup({ orgId, objectName, backupType }) {
       }
     }else if(backupType === 'Full'){
       // No additional clause
+    }else if(backupType != ''){
+      // No additional clause
+      clause += ` ${backupType}`;
     }
     console.log('clause:', clause);
     query += clause;
