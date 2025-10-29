@@ -494,7 +494,7 @@ async function performBackup({ orgId, objectName, backupType }) {
     }
 
     // Download results
-    const fileName = `export-${orgId}-${objectName}-${fileSafeTime}.csv`;
+    const fileName = `export-${orgId}-${objectName}-${backupType}-${fileSafeTime}.csv`;
     const localPath = path.join(process.cwd(), fileName);
 
     // Get the CSV data
