@@ -415,7 +415,7 @@ Resources:
           #pm2 
           sudo -i -u ubuntu bash <<'EOF'
           cd /home/ubuntu/Project-BR
-          pm2 start app.js --name salesforce-backup
+          pm2 start app.js --name salesforce-backup  --node-args="--max-old-space-size=8192"
           pm2 save
           pm2 startup systemd -u ubuntu --hp /home/ubuntu
           #sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu -k
