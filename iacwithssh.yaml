@@ -359,7 +359,7 @@ Resources:
       AWS::CloudFormation::DeletionPolicy: !If [DeleteEC2, Delete, Retain]
     Properties:
       ImageId: ami-020cba7c55df1f615
-      InstanceType: t2.micro
+      InstanceType: t2.medium
       IamInstanceProfile: !Ref QPMSInstanceProfile
       SecurityGroupIds:
         - !Ref QPMSSecurityGroup
